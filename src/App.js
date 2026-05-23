@@ -69,7 +69,7 @@ function useDB(table) {
   },[table]);
   useEffect(()=>{reload();},[reload]);
   const add = async row => {notify("Salvando...","loading");try{const s=await api.insert(table,row);setRows(r=>[...r,s]);notify("Salvo!");return s;}catch(e){notify("Erro ao salvar","err");}};
-  const update = async(id,row) => {notify("Salvando...","loading");try{const s=await api.update(table,id,row);setRows(r=>r.map(x=>x.id===id?s:x));notify("Atualizado!");return s;}catch(e){notify("Erro","err");}};
+  const update = async(id,row) => {notify("Salvando...","loading");try{const s=await api.update(table,id,row);setRows(r=>r.map(x=>x.id===id?{...x,...s}:x));notify("Atualizado!");return s;}catch(e){notify("Erro ao salvar","err");}};
   const remove = async id => {try{await api.delete(table,id);setRows(r=>r.filter(x=>x.id!==id));notify("Removido!");}catch(e){notify("Erro","err");}};
   return {rows,setRows,loading,add,update,remove,toast,reload};
 }
@@ -369,12 +369,12 @@ function Clientes({caixaAdd}){
   const [filtroStatus,setFiltroStatus]=useState("Todos");
 
   const abrir=item=>{setFicha(item);setIsNew(false);};
-  const novo=()=>{setFicha({...EMPTY_C});setIsNew(true);};
   const salvar=async form=>{
     const data={...form,valor_mensal:+form.valor_mensal||0,satisfacao:+form.satisfacao||3,duracao_meses:+form.duracao_meses||1,mes_atual:+form.mes_atual||0,status_saude:form.status_saude||"verde"};
     if(isNew) await add(data);
     else await update(ficha.id,data);
     setFicha(null);
+    setTimeout(()=>reload(),300);
   };
 
   const filtered=rows.filter(r=>{
@@ -393,7 +393,9 @@ function Clientes({caixaAdd}){
     {toast&&<Toast {...toast}/>}
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
       <div><h1 style={{color:T.text,fontSize:24,fontWeight:800,margin:0}}>Clientes</h1><p style={{color:T.sub,fontSize:14,marginTop:4}}>{ativos.length} ativos · MRR {fmt(mrr)}</p></div>
-      <Btn onClick={novo}>+ Novo cliente</Btn>
+      <div style={{background:T.accentBg,border:`1px solid ${T.accent}33`,borderRadius:10,padding:"8px 16px",fontSize:12,color:T.accentL,display:"flex",alignItems:"center",gap:8}}>
+        <span>◎</span> Novos clientes entram pelo <strong>CRM</strong>
+      </div>
     </div>
 
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
