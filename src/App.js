@@ -47,7 +47,8 @@ const api = {
     return (await r.json())[0];
   },
   async update(table, id, row) {
-    const {id:_,created_at,...data} = row;
+    // Remove only auto-generated fields, keep everything else including status_saude
+    const data = Object.fromEntries(Object.entries(row).filter(([k])=>!["id","created_at"].includes(k)));
     const r = await fetch(`${SB}/rest/v1/${table}?id=eq.${id}`,{method:"PATCH",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json",Prefer:"return=representation"},body:JSON.stringify(data)});
     if(!r.ok) throw new Error(await r.text());
     return (await r.json())[0];
@@ -267,7 +268,15 @@ function LancamentosTab({clienteId,clienteNome,caixaAdd}){
 const EMPTY_C={nome:"",contato:"",email:"",telefone:"",segmento:"",status:"Ativo",valor_mensal:"",inicio:today(),tipo_contrato:"Fee Mensal",duracao_meses:1,mes_atual:0,escopo_total:"",entregas:"",proposta_url:"",video_url:"",status_saude:"verde",satisfacao:3,nota_saude:"",observacoes:""};
 
 function FichaCliente({item,isNew,onSave,onClose,caixaAdd}){
-  const [form,setForm]=useState({...EMPTY_C,...item});
+  const [form,setForm]=useState({
+    ...EMPTY_C,
+    ...item,
+    status_saude: ["verde","amarelo","vermelho"].includes(item?.status_saude) ? item.status_saude : "verde",
+    duracao_meses: Math.max(+item?.duracao_meses||1, 1),
+    mes_atual: Math.max(+item?.mes_atual||0, 0),
+    satisfacao: +item?.satisfacao||3,
+    valor_mensal: item?.valor_mensal||"",
+  });
   const [saving,setSaving]=useState(false);
   const [tab,setTab]=useState("contrato");
   const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
@@ -354,14 +363,14 @@ function FichaCliente({item,isNew,onSave,onClose,caixaAdd}){
 
     <div style={{display:"flex",gap:8,marginTop:24,justifyContent:"flex-end",paddingTop:20,borderTop:`1px solid ${T.border}`}}>
       <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
-      <Btn onClick={async()=>{setSaving(true);await onSave({...form,valor_mensal:+form.valor_mensal||0,satisfacao:+form.satisfacao||3,duracao_meses:+form.duracao_meses||1,mes_atual:+form.mes_atual||0});setSaving(false);}} disabled={saving}>{saving?"Salvando...":"Salvar cliente"}</Btn>
+      <Btn onClick={async()=>{setSaving(true);await onSave({...form,valor_mensal:+form.valor_mensal||0,satisfacao:+form.satisfacao||3,duracao_meses:+form.duracao_meses||1,mes_atual:+form.mes_atual||0,status_saude:form.status_saude||"verde"});setSaving(false);}} disabled={saving}>{saving?"Salvando...":"Salvar cliente"}</Btn>
     </div>
   </Modal>;
 }
 
 // ─── CLIENTES PAGE ────────────────────────────────────────────────────────────
 function Clientes({caixaAdd}){
-  const {rows,loading,add,update,remove,toast}=useDB("clientes");
+  const {rows,loading,add,update,remove,toast,reload}=useDB("clientes");
   const [ficha,setFicha]=useState(null);
   const [isNew,setIsNew]=useState(false);
   const [search,setSearch]=useState("");
@@ -370,11 +379,18 @@ function Clientes({caixaAdd}){
 
   const abrir=item=>{setFicha(item);setIsNew(false);};
   const salvar=async form=>{
-    const data={...form,valor_mensal:+form.valor_mensal||0,satisfacao:+form.satisfacao||3,duracao_meses:+form.duracao_meses||1,mes_atual:+form.mes_atual||0,status_saude:form.status_saude||"verde"};
+    const data={
+      ...form,
+      valor_mensal:+form.valor_mensal||0,
+      satisfacao:+form.satisfacao||3,
+      duracao_meses:+form.duracao_meses||1,
+      mes_atual:+form.mes_atual||0,
+      status_saude:form.status_saude&&["verde","amarelo","vermelho"].includes(form.status_saude)?form.status_saude:"verde",
+    };
     if(isNew) await add(data);
     else await update(ficha.id,data);
     setFicha(null);
-    setTimeout(()=>reload(),300);
+    reload();
   };
 
   const filtered=rows.filter(r=>{
@@ -419,10 +435,11 @@ function Clientes({caixaAdd}){
     filtered.length===0?<Card><div style={{textAlign:"center",color:T.muted,padding:"32px 0",fontSize:14}}>Nenhum cliente encontrado</div></Card>:
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
       {filtered.map(item=>{
-        const saude=SAUDE[item.status_saude]||SAUDE.verde;
-        const dur=+item.duracao_meses||1;
-        const mes=Math.min(+item.mes_atual||0,dur);
-        const pct=(mes/dur)*100;
+        const saudeKey=["verde","amarelo","vermelho"].includes(item.status_saude)?item.status_saude:"verde";
+        const saude=SAUDE[saudeKey];
+        const dur=Math.max(+item.duracao_meses||1, 1);
+        const mes=Math.min(Math.max(+item.mes_atual||0, 0), dur);
+        const pct=dur>1?(mes/dur)*100:0;
         const pc=pct>=100?T.green:pct>=60?T.accent:pct>=30?T.amber:T.blue;
         return <div key={item.id} onClick={()=>abrir(item)}
           style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`3px solid ${saude.color}`,borderRadius:16,padding:20,cursor:"pointer",transition:"all 0.15s"}}
@@ -436,7 +453,7 @@ function Clientes({caixaAdd}){
             <div style={{fontSize:20,fontWeight:800,color:T.green,fontFamily:M}}>{fmt(item.valor_mensal)}<span style={{fontSize:11,color:T.muted,fontWeight:400}}>/mês</span></div>
             <Badge color={T.blue}>{item.tipo_contrato||"Fee Mensal"}</Badge>
           </div>
-          {dur>1&&<div style={{marginBottom:12}}>
+          {dur>1&&mes>=0&&<div style={{marginBottom:12}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:11,color:T.muted}}>Progresso</span><span style={{fontSize:12,fontWeight:700,color:pc,fontFamily:M}}>{mes}/{dur} meses</span></div>
             <MiniBar value={mes} max={dur} color={pc}/>
             <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:10,color:T.muted}}>Exec: {fmt((+item.valor_mensal||0)*mes)}</span><span style={{fontSize:10,color:T.muted}}>Total: {fmt((+item.valor_mensal||0)*dur)}</span></div>
@@ -680,21 +697,28 @@ function CRM({clientesAdd}){
     if(!clientesAdd) return;
     const criado = await clientesAdd({
       ...EMPTY_C,
-      nome:lead.empresa,
+      nome:lead.empresa||"",
       contato:lead.contato||"",
       email:lead.email||"",
       telefone:lead.telefone||"",
+      segmento:"",
       valor_mensal:+lead.valor_estimado||0,
       tipo_contrato:lead.tipo_contrato||"Fee Mensal",
-      duracao_meses:+lead.duracao_meses||1,
+      duracao_meses:Math.max(+lead.duracao_meses||1,1),
       mes_atual:0,
       inicio:today(),
       status:"Ativo",
       status_saude:"verde",
       satisfacao:3,
+      escopo_total:"",
+      entregas:"",
+      proposta_url:"",
+      video_url:"",
+      nota_saude:"",
+      observacoes:"",
     });
     await update(lead.id,{...lead,etapa:"Fechado"});
-    if(criado) alert("✓ "+lead.empresa+" foi cadastrado automaticamente em Clientes!");
+    if(criado) alert("✓ "+lead.empresa+" cadastrado em Clientes! Abra a ficha para completar os dados.");
   };
 
   const pipeline=rows.filter(l=>!["Fechado","Perdido"].includes(l.etapa)).reduce((s,l)=>s+(+l.valor_estimado||0),0);
