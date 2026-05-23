@@ -1,1 +1,1 @@
-# seedos
+# SeedOS
