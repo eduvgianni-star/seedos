@@ -204,25 +204,73 @@ function Stars({value,onChange}) {
   );
 }
 
+// Barra de progresso do contrato
+function ProgressoContrato({mesAtual,duracaoMeses,tipoContrato,valorContrato}) {
+  const dur = +duracaoMeses || 1;
+  const mes = Math.min(+mesAtual || 0, dur);
+  const pct = (mes/dur)*100;
+  const valorExecutado = tipoContrato==="Fee Mensal" ? (+valorContrato||0)*mes : (+valorContrato||0)*(mes/dur);
+  const valorTotal = tipoContrato==="Fee Mensal" ? (+valorContrato||0)*dur : (+valorContrato||0);
+  const color = pct>=100?C.green:pct>=60?C.accent:pct>=30?C.amber:C.blue;
+
+  return (
+    <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.text}}>📊 Progresso do contrato</div>
+        <div style={{fontSize:22,fontWeight:800,color,fontFamily:MONO}}>{mes} de {dur}</div>
+      </div>
+      {/* barra */}
+      <div style={{background:C.border,borderRadius:6,height:10,overflow:"hidden",marginBottom:10}}>
+        <div style={{background:color,width:`${pct}%`,height:"100%",borderRadius:6,transition:"width 0.4s"}}/>
+      </div>
+      {/* meses como bolinhas */}
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12}}>
+        {Array.from({length:dur},(_,i)=>(
+          <div key={i} style={{width:28,height:28,borderRadius:"50%",background:i<mes?color:C.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:i<mes?"#fff":C.muted,fontWeight:600,flexShrink:0}}>
+            {i+1}
+          </div>
+        ))}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+        <div style={{background:C.card,borderRadius:8,padding:"8px 12px"}}>
+          <div style={{fontSize:10,color:C.muted,marginBottom:3}}>EXECUTADO</div>
+          <div style={{fontSize:13,fontWeight:700,color,fontFamily:MONO}}>{fmt(valorExecutado)}</div>
+        </div>
+        <div style={{background:C.card,borderRadius:8,padding:"8px 12px"}}>
+          <div style={{fontSize:10,color:C.muted,marginBottom:3}}>TOTAL CONTRATO</div>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,fontFamily:MONO}}>{fmt(valorTotal)}</div>
+        </div>
+        <div style={{background:C.card,borderRadius:8,padding:"8px 12px"}}>
+          <div style={{fontSize:10,color:C.muted,marginBottom:3}}>A EXECUTAR</div>
+          <div style={{fontSize:13,fontWeight:700,color:C.muted,fontFamily:MONO}}>{fmt(valorTotal-valorExecutado)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FichaCliente({item,onSave,onClose}) {
-  const [form,setForm]=useState({...item});
+  const [form,setForm]=useState({
+    tipo_contrato:"Fee Mensal",duracao_meses:1,mes_atual:0,
+    escopo_total:"",video_url:"",...item
+  });
   const [saving,setSaving]=useState(false);
   const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
   const saude=SAUDE[form.status_saude]||SAUDE.verde;
 
   return (
     <Modal title="" onClose={onClose} wide>
-      {/* Header com semáforo */}
+      {/* Header */}
       <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:24,paddingBottom:20,borderBottom:`1px solid ${C.border}`}}>
         <div style={{width:52,height:52,borderRadius:14,background:saude.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>{saude.emoji}</div>
         <div style={{flex:1}}>
           <div style={{fontSize:20,fontWeight:700,color:C.text}}>{form.cliente_nome||"Nova ficha"}</div>
           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
             <Badge color={saude.color}>{saude.label}</Badge>
+            <Badge color={C.blue}>{form.tipo_contrato}</Badge>
             <span style={{fontSize:12,color:C.muted}}>{fmt(form.valor_contrato)}/mês</span>
           </div>
         </div>
-        {/* Seletor de cor visual */}
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <span style={{fontSize:12,color:C.muted}}>Saúde:</span>
           {["verde","amarelo","vermelho"].map(s=>(
@@ -232,20 +280,52 @@ function FichaCliente({item,onSave,onClose}) {
         </div>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        {/* Dados básicos */}
         <Inp label="Nome do cliente" value={form.cliente_nome||""} onChange={set("cliente_nome")}/>
-        <Inp label="Valor do contrato (R$)" type="number" value={form.valor_contrato||""} onChange={set("valor_contrato")}/>
+        <Inp label="Valor mensal (R$)" type="number" value={form.valor_contrato||""} onChange={set("valor_contrato")}/>
 
+        {/* Tipo de contrato */}
+        <Sel label="📋 Tipo de contrato" value={form.tipo_contrato||"Fee Mensal"} onChange={set("tipo_contrato")}
+          options={[{value:"Fee Mensal",label:"Fee Mensal (recorrente)"},{value:"Unitário",label:"Unitário (projeto com prazo)"}]}/>
+
+        <Sel label="⏱ Duração do contrato" value={form.duracao_meses||1} onChange={set("duracao_meses")}
+          options={[{value:1,label:"1 mês"},{value:2,label:"2 meses"},{value:3,label:"3 meses"},{value:6,label:"6 meses"},{value:12,label:"12 meses"},{value:24,label:"24 meses"}]}/>
+
+        <Sel label="📍 Mês atual (fase executada)" value={form.mes_atual||0} onChange={set("mes_atual")}
+          options={Array.from({length:(+form.duracao_meses||1)+1},(_,i)=>({value:i,label:i===0?"Não iniciado":`Mês ${i} de ${form.duracao_meses||1}`}))}/>
+
+        <Sel label="Status de saúde" value={form.status_saude||"verde"} onChange={set("status_saude")}
+          options={[{value:"verde",label:"🟢 Saudável"},{value:"amarelo",label:"🟡 Atenção"},{value:"vermelho",label:"🔴 Crítico"}]}/>
+
+        {/* Progresso visual */}
         <div style={{gridColumn:"1/-1"}}>
-          <Textarea label="📦 Entregas do contrato" full rows={4} value={form.entregas||""} onChange={set("entregas")} placeholder="Liste tudo que foi acordado entregar para este cliente..."/>
+          <ProgressoContrato mesAtual={form.mes_atual} duracaoMeses={form.duracao_meses} tipoContrato={form.tipo_contrato} valorContrato={form.valor_contrato}/>
         </div>
 
+        {/* Escopo total */}
         <div style={{gridColumn:"1/-1"}}>
-          <Inp label="🔗 Link da proposta / contrato (Google Drive, Notion, etc)" value={form.proposta_url||""} onChange={set("proposta_url")} placeholder="https://drive.google.com/..."/>
-          {form.proposta_url&&<a href={form.proposta_url} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:8,fontSize:12,color:C.blue,textDecoration:"none"}}>🔗 Abrir proposta →</a>}
+          <Textarea label="📋 Escopo total contratado" full rows={3} value={form.escopo_total||""} onChange={set("escopo_total")} placeholder="Descreva o escopo completo do contrato..."/>
         </div>
 
-        {/* Satisfação + Status */}
+        {/* Entregas por fase */}
+        <div style={{gridColumn:"1/-1"}}>
+          <Textarea label="📦 Entregas / o que já executamos" full rows={4} value={form.entregas||""} onChange={set("entregas")} placeholder="Liste as entregas realizadas e o que está previsto para os próximos meses..."/>
+        </div>
+
+        {/* Links */}
+        <div style={{gridColumn:"1/-1",display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+          <div>
+            <Inp label="🔗 Link da proposta / contrato" value={form.proposta_url||""} onChange={set("proposta_url")} placeholder="https://drive.google.com/..."/>
+            {form.proposta_url&&<a href={form.proposta_url} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:6,fontSize:12,color:C.blue,textDecoration:"none"}}>🔗 Abrir proposta →</a>}
+          </div>
+          <div>
+            <Inp label="🎥 Link do vídeo (apresentação / case)" value={form.video_url||""} onChange={set("video_url")} placeholder="https://youtube.com/... ou drive..."/>
+            {form.video_url&&<a href={form.video_url} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:6,fontSize:12,color:C.purple,textDecoration:"none"}}>▶ Abrir vídeo →</a>}
+          </div>
+        </div>
+
+        {/* Satisfação */}
         <div>
           <label style={{fontSize:12,color:C.muted,fontWeight:500,display:"block",marginBottom:8}}>⭐ Pesquisa de satisfação (1-5)</label>
           <Stars value={+form.satisfacao} onChange={v=>setForm(f=>({...f,satisfacao:v}))}/>
@@ -254,9 +334,7 @@ function FichaCliente({item,onSave,onClose}) {
           </div>
         </div>
 
-        <Sel label="Status de saúde" value={form.status_saude||"verde"} onChange={set("status_saude")}
-          options={[{value:"verde",label:"🟢 Saudável"},{value:"amarelo",label:"🟡 Atenção"},{value:"vermelho",label:"🔴 Crítico"}]}/>
-
+        {/* Nota interna */}
         <div style={{gridColumn:"1/-1"}}>
           <Textarea label="📝 Como está nosso trabalho para este cliente?" full rows={4}
             value={form.nota_saude||""} onChange={set("nota_saude")}
@@ -283,10 +361,10 @@ function Carteira() {
   const [search,setSearch]=useState("");
   const [filtro,setFiltro]=useState("todos");
 
-  const novo=()=>{setDetalhe({cliente_nome:"",valor_contrato:"",entregas:"",proposta_url:"",satisfacao:3,status_saude:"verde",nota_saude:"",observacoes:""});setModal("novo");};
+  const novo=()=>{setDetalhe({cliente_nome:"",valor_contrato:"",entregas:"",proposta_url:"",satisfacao:3,status_saude:"verde",nota_saude:"",observacoes:"",tipo_contrato:"Fee Mensal",duracao_meses:1,mes_atual:0,escopo_total:"",video_url:""});setModal("novo");};
   const abrir=item=>{setDetalhe(item);setModal("editar");};
-  const salvarNovo=async form=>{await add({...form,valor_contrato:+form.valor_contrato,satisfacao:+form.satisfacao});setModal(null);setDetalhe(null);};
-  const salvarEdicao=async form=>{await update(detalhe.id,{...form,valor_contrato:+form.valor_contrato,satisfacao:+form.satisfacao});setModal(null);setDetalhe(null);};
+  const salvarNovo=async form=>{await add({...form,valor_contrato:+form.valor_contrato,satisfacao:+form.satisfacao,duracao_meses:+form.duracao_meses,mes_atual:+form.mes_atual});setModal(null);setDetalhe(null);};
+  const salvarEdicao=async form=>{await update(detalhe.id,{...form,valor_contrato:+form.valor_contrato,satisfacao:+form.satisfacao,duracao_meses:+form.duracao_meses,mes_atual:+form.mes_atual});setModal(null);setDetalhe(null);};
 
   const filtered=rows.filter(r=>{
     const ms=r.cliente_nome?.toLowerCase().includes(search.toLowerCase());
@@ -342,17 +420,38 @@ function Carteira() {
                   <div style={{fontWeight:700,fontSize:15,color:C.text}}>{item.cliente_nome||"Sem nome"}</div>
                   <div style={{fontSize:12,color:C.muted,marginTop:2}}>{fmt(item.valor_contrato)}/mês</div>
                 </div>
-                <Badge color={saude.color}>{saude.emoji} {saude.label}</Badge>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                  <Badge color={saude.color}>{saude.emoji} {saude.label}</Badge>
+                  <Badge color={C.blue}>{item.tipo_contrato||"Fee Mensal"}</Badge>
+                </div>
               </div>
-              {item.entregas&&<div style={{fontSize:12,color:C.muted,marginBottom:10,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>📦 {item.entregas}</div>}
+              {(+item.duracao_meses||0)>1&&(()=>{
+                const dur=+item.duracao_meses||1;const mes=Math.min(+item.mes_atual||0,dur);
+                const pct=(mes/dur)*100;const color=pct>=100?C.green:pct>=60?C.accent:pct>=30?C.amber:C.blue;
+                return(<div style={{marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:11,color:C.muted}}>Progresso</span>
+                    <span style={{fontSize:12,fontWeight:700,color,fontFamily:MONO}}>{mes} de {dur} meses</span>
+                  </div>
+                  <div style={{background:C.border,borderRadius:4,height:6,overflow:"hidden"}}>
+                    <div style={{background:color,width:`${pct}%`,height:"100%",borderRadius:4}}/>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
+                    <span style={{fontSize:10,color:C.muted}}>Exec: {fmt((+item.valor_contrato||0)*mes)}</span>
+                    <span style={{fontSize:10,color:C.muted}}>Total: {fmt((+item.valor_contrato||0)*dur)}</span>
+                  </div>
+                </div>);
+              })()}
+              {item.escopo_total&&<div style={{fontSize:12,color:C.muted,marginBottom:6,display:"-webkit-box",WebkitLineClamp:1,WebkitBoxOrient:"vertical",overflow:"hidden"}}>📋 {item.escopo_total}</div>}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:10,borderTop:`1px solid ${C.border}`}}>
                 <Stars value={+item.satisfacao}/>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
                   {item.proposta_url&&<span style={{fontSize:11,color:C.blue}}>🔗</span>}
+                  {item.video_url&&<span style={{fontSize:11,color:C.purple}}>▶</span>}
                   <span style={{fontSize:11,color:C.muted}}>Ver ficha →</span>
                 </div>
               </div>
-              {item.nota_saude&&<div style={{marginTop:10,padding:"8px 12px",background:saude.bg,borderRadius:8,fontSize:12,color:saude.color,borderLeft:`2px solid ${saude.color}`}}>💬 {item.nota_saude.slice(0,100)}{item.nota_saude.length>100?"...":""}</div>}
+              {item.nota_saude&&<div style={{marginTop:10,padding:"8px 12px",background:saude.bg,borderRadius:8,fontSize:12,color:saude.color,borderLeft:`2px solid ${saude.color}`}}>💬 {item.nota_saude.slice(0,80)}{item.nota_saude.length>80?"...":""}</div>}
               <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}>
                 <Btn variant="danger" small onClick={e=>{e.stopPropagation();remove(item.id);}}>✕ Remover</Btn>
               </div>
