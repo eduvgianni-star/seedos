@@ -30,6 +30,7 @@ const SAUDE = {
 };
 
 const ETAPAS = ["Prospecção","Qualificação","Proposta","Negociação","Fechado","Perdido"];
+const EMPTY_LEAD = {empresa:"",contato:"",email:"",telefone:"",etapa:"Prospecção",valor_estimado:"",tipo_contrato:"Fee Mensal",duracao_meses:1,origem:"Indicação",data_contato:today(),proximo_passo:"",observacoes:""};
 const ETAPA_C = {Prospecção:T.blue,Qualificação:T.accent,Proposta:T.purple,Negociação:T.amber,Fechado:T.green,Perdido:T.red};
 
 // ─── DB ───────────────────────────────────────────────────────────────────────
@@ -370,8 +371,9 @@ function Clientes({caixaAdd}){
   const abrir=item=>{setFicha(item);setIsNew(false);};
   const novo=()=>{setFicha({...EMPTY_C});setIsNew(true);};
   const salvar=async form=>{
-    if(isNew) await add(form);
-    else await update(ficha.id,form);
+    const data={...form,valor_mensal:+form.valor_mensal||0,satisfacao:+form.satisfacao||3,duracao_meses:+form.duracao_meses||1,mes_atual:+form.mes_atual||0,status_saude:form.status_saude||"verde"};
+    if(isNew) await add(data);
+    else await update(ficha.id,data);
     setFicha(null);
   };
 
@@ -642,29 +644,55 @@ function CRM({clientesAdd}){
   const [modal,setModal]=useState(false);
   const [edit,setEdit]=useState(null);
   const [search,setSearch]=useState("");
-  const [form,setForm]=useState({empresa:"",contato:"",email:"",telefone:"",etapa:"Prospecção",valor_estimado:"",origem:"Indicação",data_contato:today(),proximo_passo:"",observacoes:""});
+  const [form,setForm]=useState({...EMPTY_LEAD});
   const s=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
 
-  const save=async()=>{if(!form.empresa)return;await add({...form,valor_estimado:+form.valor_estimado||0});setModal(false);setForm({empresa:"",contato:"",email:"",telefone:"",etapa:"Prospecção",valor_estimado:"",origem:"Indicação",data_contato:today(),proximo_passo:"",observacoes:""});};
+  const save=async()=>{if(!form.empresa)return;await add({...form,valor_estimado:+form.valor_estimado||0,duracao_meses:+form.duracao_meses||1});setModal(false);setForm({...EMPTY_LEAD});};
   const saveEdit=async f=>{await update(edit.id,{...f,valor_estimado:+f.valor_estimado||0});setEdit(null);};
-  const moveEtapa=async(id,etapa)=>{const r=rows.find(x=>x.id===id);if(r)await update(id,{...r,etapa});};
+  const moveEtapa=async(id,etapa)=>{
+    const r=rows.find(x=>x.id===id);
+    if(!r) return;
+    await update(id,{...r,etapa});
+    if(etapa==="Fechado" && r.etapa!=="Fechado" && clientesAdd){
+      const criado = await clientesAdd({
+        ...EMPTY_C,
+        nome:r.empresa,
+        contato:r.contato||"",
+        email:r.email||"",
+        telefone:r.telefone||"",
+        valor_mensal:+r.valor_estimado||0,
+        tipo_contrato:r.tipo_contrato||"Fee Mensal",
+        duracao_meses:+r.duracao_meses||1,
+        mes_atual:0,
+        inicio:today(),
+        status:"Ativo",
+        status_saude:"verde",
+        satisfacao:3,
+      });
+      if(criado) alert("✓ "+r.empresa+" foi cadastrado automaticamente em Clientes!");
+    }
+  };
 
   // Fechar lead e virar cliente com 1 clique
   const fecharComoCliente=async(lead)=>{
     if(!clientesAdd) return;
-    await clientesAdd({
+    const criado = await clientesAdd({
       ...EMPTY_C,
       nome:lead.empresa,
       contato:lead.contato||"",
       email:lead.email||"",
       telefone:lead.telefone||"",
-      valor_mensal:lead.valor_estimado||0,
+      valor_mensal:+lead.valor_estimado||0,
+      tipo_contrato:lead.tipo_contrato||"Fee Mensal",
+      duracao_meses:+lead.duracao_meses||1,
+      mes_atual:0,
       inicio:today(),
       status:"Ativo",
       status_saude:"verde",
+      satisfacao:3,
     });
     await update(lead.id,{...lead,etapa:"Fechado"});
-    alert(`✓ ${lead.empresa} foi cadastrado como cliente!`);
+    if(criado) alert("✓ "+lead.empresa+" foi cadastrado automaticamente em Clientes!");
   };
 
   const pipeline=rows.filter(l=>!["Fechado","Perdido"].includes(l.etapa)).reduce((s,l)=>s+(+l.valor_estimado||0),0);
@@ -745,6 +773,8 @@ function CRM({clientesAdd}){
         <Inp label="Telefone" value={form.telefone} onChange={s("telefone")}/>
         <Sel label="Etapa" value={form.etapa} onChange={s("etapa")} options={ETAPAS}/>
         <Inp label="Valor estimado (R$)" type="number" value={form.valor_estimado} onChange={s("valor_estimado")}/>
+        <Sel label="Tipo de contrato" value={form.tipo_contrato||"Fee Mensal"} onChange={s("tipo_contrato")} options={[{value:"Fee Mensal",label:"Fee Mensal (recorrente)"},{value:"Unitário",label:"Unitário (projeto com prazo)"}]}/>
+        <Sel label="Duração estimada" value={form.duracao_meses||1} onChange={s("duracao_meses")} options={[1,2,3,6,12,24].map(n=>({value:n,label:`${n} ${n===1?"mês":"meses"}`}))}/>
         <Sel label="Origem" value={form.origem} onChange={s("origem")} options={["Indicação","LinkedIn","Site","Cold Outreach","Evento","Instagram","Outro"]}/>
         <Inp label="Data do contato" type="date" value={form.data_contato} onChange={s("data_contato")}/>
         <Inp label="Próximo passo" full value={form.proximo_passo} onChange={s("proximo_passo")}/>
@@ -753,7 +783,7 @@ function CRM({clientesAdd}){
       <div style={{display:"flex",gap:8,marginTop:20,justifyContent:"flex-end"}}><Btn variant="ghost" onClick={()=>setModal(false)}>Cancelar</Btn><Btn onClick={save}>Salvar lead</Btn></div>
     </Modal>}
     {edit&&<Modal title={`Editar: ${edit.empresa}`} onClose={()=>setEdit(null)} wide>
-      <QuickEdit item={edit} fields={[{k:"empresa",l:"Empresa",full:true},{k:"contato",l:"Contato"},{k:"email",l:"Email",t:"email"},{k:"telefone",l:"Telefone"},{k:"etapa",l:"Etapa",t:"select",opts:ETAPAS},{k:"valor_estimado",l:"Valor estimado",t:"number"},{k:"origem",l:"Origem",t:"select",opts:["Indicação","LinkedIn","Site","Cold Outreach","Evento","Instagram","Outro"]},{k:"proximo_passo",l:"Próximo passo",full:true},{k:"observacoes",l:"Observações",t:"textarea",full:true}]} onSave={saveEdit} onClose={()=>setEdit(null)}/>
+      <QuickEdit item={edit} fields={[{k:"empresa",l:"Empresa",full:true},{k:"contato",l:"Contato"},{k:"email",l:"Email",t:"email"},{k:"telefone",l:"Telefone"},{k:"etapa",l:"Etapa",t:"select",opts:ETAPAS},{k:"valor_estimado",l:"Valor estimado",t:"number"},{k:"tipo_contrato",l:"Tipo de contrato",t:"select",opts:["Fee Mensal","Unitário"]},{k:"duracao_meses",l:"Duração (meses)",t:"number"},{k:"origem",l:"Origem",t:"select",opts:["Indicação","LinkedIn","Site","Cold Outreach","Evento","Instagram","Outro"]},{k:"proximo_passo",l:"Próximo passo",full:true},{k:"observacoes",l:"Observações",t:"textarea",full:true}]} onSave={saveEdit} onClose={()=>setEdit(null)}/>
     </Modal>}
   </div>;
 }
