@@ -331,6 +331,77 @@ function ContractProgress({ dur, mes, valor, tipo }) {
 // ─── CLIENTE FICHA ────────────────────────────────────────────────────────────
 const EMPTY_CLIENTE = { nome: "", contato: "", email: "", telefone: "", segmento: "", status: "Ativo", valor_mensal: "", inicio: today(), tipo_contrato: "Fee Mensal", duracao_meses: 1, mes_atual: 0, escopo_total: "", entregas: "", proposta_url: "", video_url: "", status_saude: "verde", satisfacao: 3, nota_saude: "", observacoes: "" };
 
+// ─── LANÇAMENTOS POR CLIENTE ─────────────────────────────────────────────────
+function LancamentosCliente({ clienteId, clienteNome }) {
+  const { rows, loading, add, remove, toast } = useDB("lancamentos_clientes");
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ descricao: "", tipo: "Receita", categoria: "Projeto Avulso", valor: "", data: today(), observacoes: "" });
+  const s = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const meus = rows.filter(r => +r.cliente_id === +clienteId);
+  const totalReceita = meus.filter(r => r.tipo === "Receita").reduce((s, r) => s + (+r.valor || 0), 0);
+  const totalCusto = meus.filter(r => r.tipo === "Custo").reduce((s, r) => s + (+r.valor || 0), 0);
+
+  const save = async () => {
+    if (!form.descricao || !form.valor) return;
+    await add({ ...form, cliente_id: clienteId, cliente_nome: clienteNome, valor: +form.valor });
+    setModal(false);
+    setForm({ descricao: "", tipo: "Receita", categoria: "Projeto Avulso", valor: "", data: today(), observacoes: "" });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {toast && <Toast {...toast} />}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ fontSize: 13, color: T.green, fontWeight: 600 }}>+{fmt(totalReceita)}</div>
+          <div style={{ fontSize: 13, color: T.red, fontWeight: 600 }}>-{fmt(totalCusto)}</div>
+          <div style={{ fontSize: 13, color: T.accent, fontWeight: 600 }}>={fmt(totalReceita - totalCusto)}</div>
+        </div>
+        <Btn small onClick={() => setModal(true)}>+ Novo lançamento</Btn>
+      </div>
+
+      {loading ? <div style={{ color: T.muted, textAlign: "center", padding: 24 }}>Carregando...</div>
+        : meus.length === 0
+          ? <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: "24px 0" }}>Nenhum lançamento avulso ainda. Adicione uma diária extra, projeto pontual, etc.</div>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[...meus].sort((a, b) => (b.data || "").localeCompare(a.data || "")).map(l => (
+              <div key={l.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{l.descricao}</div>
+                  <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{l.data} · {l.categoria}</div>
+                  {l.observacoes && <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>{l.observacoes}</div>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                  <span style={{ fontFamily: M, fontWeight: 700, fontSize: 14, color: l.tipo === "Receita" ? T.green : T.red }}>
+                    {l.tipo === "Receita" ? "+" : "-"}{fmt(l.valor)}
+                  </span>
+                  <Btn variant="danger" small onClick={() => remove(l.id)}>✕</Btn>
+                </div>
+              </div>
+            ))}
+          </div>}
+
+      {modal && (
+        <Modal title="Novo lançamento avulso" onClose={() => setModal(false)}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Inp label="Descrição *" full value={form.descricao} onChange={s("descricao")} placeholder="Ex: Diária extra, reunião pontual..." />
+            <Sel label="Tipo" value={form.tipo} onChange={s("tipo")} options={["Receita", "Custo"]} />
+            <Sel label="Categoria" value={form.categoria} onChange={s("categoria")} options={["Projeto Avulso", "Diária Extra", "Consultoria", "Material", "Deslocamento", "Outros"]} />
+            <Inp label="Valor (R$) *" type="number" value={form.valor} onChange={s("valor")} />
+            <Inp label="Data" type="date" value={form.data} onChange={s("data")} />
+            <Tex label="Observações" full value={form.observacoes} onChange={s("observacoes")} />
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>
+            <Btn variant="ghost" onClick={() => setModal(false)}>Cancelar</Btn>
+            <Btn onClick={save}>Salvar</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 function FichaCliente({ item, onSave, onClose }) {
   const [form, setForm] = useState({ ...EMPTY_CLIENTE, ...item });
   const [saving, setSaving] = useState(false);
@@ -338,7 +409,7 @@ function FichaCliente({ item, onSave, onClose }) {
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const saude = SAUDE[form.status_saude] || SAUDE.verde;
 
-  const tabs = [{ id: "contrato", label: "Contrato" }, { id: "entregas", label: "Entregas" }, { id: "saude", label: "Saúde" }];
+  const tabs = [{ id: "contrato", label: "Contrato" }, { id: "entregas", label: "Entregas" }, { id: "saude", label: "Saúde" }, { id: "lancamentos", label: "Lançamentos" }];
 
   return (
     <Modal title="" onClose={onClose} wide>
@@ -436,6 +507,13 @@ function FichaCliente({ item, onSave, onClose }) {
             </div>
           </div>
         </div>
+      )}
+
+      {tab === "lancamentos" && item.id && (
+        <LancamentosCliente clienteId={item.id} clienteNome={form.nome} />
+      )}
+      {tab === "lancamentos" && !item.id && (
+        <div style={{ color: T.muted, fontSize: 13, textAlign: "center", padding: "32px 0" }}>Salve o cliente primeiro para adicionar lançamentos.</div>
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 24, justifyContent: "flex-end", paddingTop: 20, borderTop: `1px solid ${T.border}` }}>
