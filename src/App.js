@@ -34,6 +34,38 @@ const EMPTY_LEAD = {empresa:"",contato:"",email:"",telefone:"",etapa:"Prospecç�
 const ETAPA_C = {Prospecção:T.blue,Qualificação:T.accent,Proposta:T.purple,Negociação:T.amber,Fechado:T.green,Perdido:T.red};
 
 
+
+// ─── CONFIRM MODAL ────────────────────────────────────────────────────────────
+function ConfirmModal({title,msg,onConfirm,onClose,danger=true}){
+  return (
+    <div style={{position:"fixed",inset:0,background:"#00000095",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(4px)"}}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{background:"#1a1a24",border:`1px solid ${danger?"#ef444433":"#6366f133"}`,borderRadius:20,padding:"32px 36px",width:"100%",maxWidth:400,textAlign:"center",boxShadow:"0 24px 60px #00000080"}}>
+        <div style={{fontSize:36,marginBottom:16}}>{danger?"⚠️":"❓"}</div>
+        <h3 style={{color:"#f0f0fa",fontSize:18,fontWeight:700,margin:"0 0 10px"}}>{title}</h3>
+        <p style={{color:"#8888aa",fontSize:14,margin:"0 0 28px",lineHeight:1.6}}>{msg}</p>
+        <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+          <button onClick={onClose}
+            style={{background:"transparent",border:"1px solid #252533",borderRadius:10,color:"#8888aa",padding:"10px 24px",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
+            Cancelar
+          </button>
+          <button onClick={()=>{onConfirm();onClose();}}
+            style={{background:danger?"#ef444420":"#6366f120",border:`1px solid ${danger?"#ef444444":"#6366f144"}`,borderRadius:10,color:danger?"#ef4444":"#818cf8",padding:"10px 24px",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
+            {danger?"Sim, confirmar":"Confirmar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useConfirm(){
+  const [state,setState]=useState(null);
+  const confirm=(title,msg,onConfirm,danger=true)=>setState({title,msg,onConfirm,danger});
+  const modal=state?<ConfirmModal {...state} onClose={()=>setState(null)}/>:null;
+  return {confirm,modal};
+}
+
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 async function getSession() {
   try {
@@ -364,7 +396,7 @@ function LancamentosTab({clienteId,clienteNome,caixaAdd}){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
           <span style={{fontFamily:M,fontWeight:700,fontSize:14,color:l.tipo==="Receita"?T.green:T.red}}>{l.tipo==="Receita"?"+":"-"}{fmt(l.valor)}</span>
-          <Btn variant="danger" small onClick={()=>remove(l.id)}>✕</Btn>
+          <Btn variant="danger" small onClick={()=>{if(window.confirm(`Remover lançamento "${l.descricao}"?`))remove(l.id);}}>✕</Btn>
         </div>
       </div>)}
     </div>}
@@ -684,7 +716,7 @@ function Clientes({caixaAdd}){
           </div>
           {item.nota_saude&&<div style={{marginTop:10,padding:"8px 12px",background:saude.bg,borderRadius:8,fontSize:12,color:saude.color,borderLeft:`2px solid ${saude.color}`}}>{item.nota_saude.slice(0,80)}{item.nota_saude.length>80?"...":""}</div>}
           <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}>
-            <Btn variant="danger" small onClick={e=>{e.stopPropagation();remove(item.id);}}>Remover</Btn>
+            <Btn variant="danger" small onClick={e=>{e.stopPropagation();if(window.confirm(`Remover ${item.nome}? Esta ação não pode ser desfeita.`))remove(item.id);}}>Remover</Btn>
           </div>
         </div>;
       })}
@@ -735,7 +767,7 @@ function PatrimonioTab({db}){
         {key:"data",label:"Data"},
         {key:"rendimento_mensal",label:"Rendimento/mês",align:"right",render:v=><span style={{fontFamily:M,color:T.accent,fontWeight:600}}>{+v>0?`+${fmt(v)}`:"-"}</span>},
         {key:"valor",label:"Valor",align:"right",render:v=><span style={{fontFamily:M,fontWeight:700,color:T.green}}>{fmt(v)}</span>},
-        {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>db.remove(v)}>✕</Btn></div>},
+        {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>{if(window.confirm("Remover este registro? Esta ação não pode ser desfeita."))db.remove(v);}}>✕</Btn></div>},
       ]} rows={db.rows}/>
     </Card>
 
@@ -811,7 +843,7 @@ function CaixaTab({db}){
         {key:"descricao",label:"Descrição",render:(v,r)=><div><div style={{fontWeight:600}}>{v}</div><div style={{fontSize:11,color:T.muted}}>{r.categoria}</div></div>},
         {key:"tipo",label:"Tipo",render:v=><Badge color={v==="Entrada"?T.green:T.red}>{v}</Badge>},
         {key:"valor",label:"Valor",align:"right",render:(v,r)=><span style={{fontFamily:M,fontWeight:700,color:r.tipo==="Entrada"?T.green:T.red}}>{r.tipo==="Entrada"?"+":"-"}{fmt(v)}</span>},
-        {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>db.remove(v)}>✕</Btn></div>},
+        {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>{if(window.confirm("Remover este registro? Esta ação não pode ser desfeita."))db.remove(v);}}>✕</Btn></div>},
       ]} rows={rows}/>
     </Card>
     {modal&&<Modal title="Lançamento manual" onClose={()=>setModal(false)}>
@@ -852,7 +884,7 @@ function CustosTab({db}){
         {key:"mes",label:"Mês"},
         {key:"recorrente",label:"Tipo",render:v=><Badge color={(v===true||v==="true")?T.red:T.muted}>{(v===true||v==="true")?"Fixo":"Variável"}</Badge>},
         {key:"valor",label:"Valor",align:"right",render:v=><span style={{fontFamily:M,fontWeight:700,color:T.amber}}>{fmt(v)}</span>},
-        {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>db.remove(v)}>✕</Btn></div>},
+        {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>{if(window.confirm("Remover este registro? Esta ação não pode ser desfeita."))db.remove(v);}}>✕</Btn></div>},
       ]} rows={db.rows}/>
     </Card>
     {modal&&<Modal title="Novo Custo" onClose={()=>setModal(false)}>
@@ -893,7 +925,7 @@ function InvestTab({db}){
         {key:"data",label:"Data"},
         {key:"retorno_esperado",label:"Retorno / Obs.",render:v=><span style={{fontSize:12,color:T.muted}}>{v}</span>},
         {key:"valor",label:"Valor",align:"right",render:v=><span style={{fontFamily:M,fontWeight:700,color:T.blue}}>{fmt(v)}</span>},
-        {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>db.remove(v)}>✕</Btn></div>},
+        {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>{if(window.confirm("Remover este registro? Esta ação não pode ser desfeita."))db.remove(v);}}>✕</Btn></div>},
       ]} rows={db.rows}/>
     </Card>
     {modal&&<Modal title="Novo investimento na empresa" onClose={()=>setModal(false)}>
@@ -955,6 +987,7 @@ function CRM({clientesAdd}){
     if(!r) return;
     await update(id,{...r,etapa});
     if(etapa==="Fechado" && r.etapa!=="Fechado" && clientesAdd){
+      if(!window.confirm(`Mover ${r.empresa} para Fechado e criar como cliente automaticamente?`)) return;
       const criado = await clientesAdd({
         ...EMPTY_C,
         nome:r.empresa,
@@ -977,6 +1010,7 @@ function CRM({clientesAdd}){
   // Fechar lead e virar cliente com 1 clique
   const fecharComoCliente=async(lead)=>{
     if(!clientesAdd) return;
+    if(!window.confirm(`Fechar ${lead.empresa} e criar como cliente? Isso vai cadastrá-lo automaticamente na aba Clientes.`)) return;
     const criado = await clientesAdd({
       ...EMPTY_C,
       nome:lead.empresa||"",
@@ -1051,7 +1085,7 @@ function CRM({clientesAdd}){
               <select onChange={e=>moveEtapa(lead.id,e.target.value)} value={lead.etapa} style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,color:T.sub,fontSize:11,padding:"4px 6px",fontFamily:F,cursor:"pointer",flex:1}}>
                 {ETAPAS.map(e=><option key={e} value={e}>{e}</option>)}
               </select>
-              <Btn variant="danger" small onClick={()=>remove(lead.id)}>✕</Btn>
+              <Btn variant="danger" small onClick={()=>{if(window.confirm(`Remover lead ${lead.empresa}?`))remove(lead.id);}}>✕</Btn>
             </div>
             {lead.etapa==="Negociação"&&<Btn variant="success" small full style={{marginTop:8}} onClick={()=>fecharComoCliente(lead)}>✓ Fechar e virar cliente</Btn>}
           </div>)}
@@ -1068,7 +1102,7 @@ function CRM({clientesAdd}){
         {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}>
           {r.etapa==="Negociação"&&<Btn variant="success" small onClick={()=>fecharComoCliente(r)}>✓ Fechar</Btn>}
           <Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn>
-          <Btn variant="danger" small onClick={()=>remove(v)}>✕</Btn>
+          <Btn variant="danger" small onClick={()=>{if(window.confirm(`Remover lead ${r.empresa}?`))remove(v);}}>✕</Btn>
         </div>},
       ]} rows={filtered}/>
     </Card>}
@@ -1319,7 +1353,7 @@ export default function App(){
 
       {!collapsed&&<div style={{padding:"14px 20px",borderTop:`1px solid ${T.border}`}}>
         <div style={{fontSize:11,color:T.sub,marginBottom:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>👤 {user?.email||""}</div>
-        <button onClick={logout} style={{background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,color:T.muted,fontSize:11,padding:"5px 10px",cursor:"pointer",fontFamily:F,width:"100%",marginBottom:8}}>Sair da conta</button>
+        <button onClick={()=>{if(window.confirm("Tem certeza que deseja sair da conta?"))logout();}} style={{background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,color:T.muted,fontSize:11,padding:"5px 10px",cursor:"pointer",fontFamily:F,width:"100%",marginBottom:8}}>Sair da conta</button>
         <div style={{fontSize:10,color:T.dim,lineHeight:1.6}}>Dados salvos · Supabase 🇧🇷</div>
       </div>}
     </aside>
