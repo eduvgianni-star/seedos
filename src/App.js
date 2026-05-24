@@ -633,7 +633,7 @@ function PatrimonioTab({db}){
 }
 
 // ─── FINANCEIRO ───────────────────────────────────────────────────────────────
-function Financeiro({caixaDB,custosDB,invDB,patrimonioDBext}){
+function Financeiro({caixaDB,custosDB,invDB}){
   const [aba,setAba]=useState("caixa");
   const patrimonioDB=useDB("patrimonio");
   const entradas=caixaDB.rows.filter(c=>c.tipo==="Entrada").reduce((s,c)=>s+(+c.valor),0);
@@ -973,7 +973,7 @@ function CRM({clientesAdd}){
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function Dashboard({clientes,caixa,custos,investimentos,leads,lancamentos}){
+function Dashboard({clientes,caixa,custos,investimentos,leads,lancamentos,patrimonio}){
   const ativos=clientes.filter(c=>c.status==="Ativo");
   const mrr=ativos.reduce((s,c)=>s+(+c.valor_mensal||0),0);
   const entradas=caixa.filter(c=>c.tipo==="Entrada").reduce((s,c)=>s+(+c.valor),0);
@@ -1013,7 +1013,7 @@ function Dashboard({clientes,caixa,custos,investimentos,leads,lancamentos}){
       <KPI label="MRR" value={fmtK(mrr)} sub={`${ativos.length} clientes ativos`} color={T.blue} icon="◆"/>
       <KPI label="Pipeline CRM" value={fmtK(pipeline)} sub={`${leads.filter(l=>!["Fechado","Perdido"].includes(l.etapa)).length} leads abertos`} color={T.purple} icon="◎"/>
       <KPI label="Investimentos" value={fmtK(invTotal)} sub="Equip. e capacitação" color={T.blue} icon="◇"/>
-      <KPI label="Patrimônio" value={fmtK(patrimonioDB.rows.reduce((s,i)=>s+(+i.valor||0),0))} sub="Guardado/rendendo" color={T.green} icon="💎"/>
+      <KPI label="Patrimônio" value={fmtK((patrimonio||[]).reduce((s,i)=>s+(+i.valor||0),0))} sub="Guardado/rendendo" color={T.green} icon="💎"/>
       <KPI label="Resultado" value={fmtK(resultado)} sub={`Margem ${fmtPct(margem)}`} color={T.green} icon="✓"/>
     </div>
 
@@ -1122,6 +1122,7 @@ export default function App(){
   const invDB=useDB("investimentos");
   const leadsDB=useDB("leads");
   const lancDB=useDB("lancamentos_clientes");
+  const patrimonioDBroot=useDB("patrimonio");
 
   // Função que adiciona no caixa (passada para componentes filhos)
   const caixaAdd=async(row)=>{
@@ -1134,7 +1135,7 @@ export default function App(){
   };
 
   const pages={
-    dashboard:<Dashboard clientes={clientesDB.rows} caixa={caixaDB.rows} custos={custosDB.rows} investimentos={invDB.rows} leads={leadsDB.rows} lancamentos={lancDB.rows}/>,
+    dashboard:<Dashboard clientes={clientesDB.rows} caixa={caixaDB.rows} custos={custosDB.rows} investimentos={invDB.rows} leads={leadsDB.rows} lancamentos={lancDB.rows} patrimonio={patrimonioDBroot.rows}/>,
     clientes:<Clientes caixaAdd={caixaAdd}/>,
     financeiro:<Financeiro caixaDB={caixaDB} custosDB={custosDB} invDB={invDB}/>,
     crm:<CRM clientesAdd={clientesAdd}/>,
