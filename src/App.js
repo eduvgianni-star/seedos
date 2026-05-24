@@ -570,9 +570,72 @@ function Clientes({caixaAdd}){
   </div>;
 }
 
+
+// ─── PATRIMÔNIO TAB ───────────────────────────────────────────────────────────
+function PatrimonioTab({db}){
+  const [modal,setModal]=useState(false);
+  const [edit,setEdit]=useState(null);
+  const [form,setForm]=useState({descricao:"",categoria:"Caixa em banco",valor:"",data:today(),rendimento_mensal:"",observacoes:""});
+  const s=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
+  const save=async()=>{if(!form.descricao||!form.valor)return;await db.add({...form,valor:+form.valor,rendimento_mensal:+form.rendimento_mensal||0});setModal(false);setForm({descricao:"",categoria:"Caixa em banco",valor:"",data:today(),rendimento_mensal:"",observacoes:""});};
+  const saveEdit=async f=>{await db.update(edit.id,{...f,valor:+f.valor,rendimento_mensal:+f.rendimento_mensal||0});setEdit(null);};
+  const total=db.rows.reduce((s,i)=>s+(+i.valor||0),0);
+  const rendimento=db.rows.reduce((s,i)=>s+(+i.rendimento_mensal||0),0);
+
+  const porCat=db.rows.reduce((acc,i)=>{acc[i.categoria]=(acc[i.categoria]||0)+(+i.valor||0);return acc;},{});
+  const catColors={
+    "Caixa em banco":T.green,
+    "Conta corrente":T.blue,
+    "Investimento CDB/CDI":T.accent,
+    "Poupança":T.amber,
+    "Outros":T.muted,
+  };
+
+  return <div style={{display:"flex",flexDirection:"column",gap:20}}>
+    <div style={{background:T.greenBg,border:`1px solid ${T.green}33`,borderRadius:12,padding:"14px 18px",fontSize:13,color:T.green,fontWeight:500}}>
+      💎 Patrimônio financeiro — dinheiro que vocês têm guardado/rendendo. Não entra no resultado operacional.
+    </div>
+
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+      <KPI label="Total patrimônio" value={fmt(total)} color={T.green} icon="💎"/>
+      <KPI label="Rendimento mensal" value={fmt(rendimento)} sub="Estimado/mês" color={T.accent} icon="📈"/>
+      {Object.entries(porCat).map(([cat,val])=><KPI key={cat} label={cat} value={fmtK(val)} color={catColors[cat]||T.muted}/>)}
+    </div>
+
+    <div style={{display:"flex",justifyContent:"flex-end"}}><Btn small onClick={()=>setModal(true)}>+ Registrar patrimônio</Btn></div>
+
+    <Card style={{padding:0}}>
+      <Table cols={[
+        {key:"descricao",label:"Descrição",render:(v,r)=><div><div style={{fontWeight:600}}>{v}</div>{r.observacoes&&<div style={{fontSize:11,color:T.muted}}>{r.observacoes}</div>}</div>},
+        {key:"categoria",label:"Categoria",render:v=><Badge color={catColors[v]||T.muted}>{v}</Badge>},
+        {key:"data",label:"Data"},
+        {key:"rendimento_mensal",label:"Rendimento/mês",align:"right",render:v=><span style={{fontFamily:M,color:T.accent,fontWeight:600}}>{+v>0?`+${fmt(v)}`:"-"}</span>},
+        {key:"valor",label:"Valor",align:"right",render:v=><span style={{fontFamily:M,fontWeight:700,color:T.green}}>{fmt(v)}</span>},
+        {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>db.remove(v)}>✕</Btn></div>},
+      ]} rows={db.rows}/>
+    </Card>
+
+    {modal&&<Modal title="Registrar patrimônio" onClose={()=>setModal(false)}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        <Inp label="Descrição *" full value={form.descricao} onChange={s("descricao")} placeholder="Ex: Saldo Nubank, CDB Banco X..."/>
+        <Sel label="Categoria" value={form.categoria} onChange={s("categoria")} options={["Caixa em banco","Conta corrente","Investimento CDB/CDI","Poupança","Outros"]}/>
+        <Inp label="Valor atual (R$) *" type="number" value={form.valor} onChange={s("valor")}/>
+        <Inp label="Rendimento mensal (R$)" type="number" value={form.rendimento_mensal} onChange={s("rendimento_mensal")} placeholder="Ex: 150"/>
+        <Inp label="Data" type="date" value={form.data} onChange={s("data")}/>
+        <Tex label="Observações" full value={form.observacoes} onChange={s("observacoes")} placeholder="Ex: CDI 110%, vencimento em..."/>
+      </div>
+      <div style={{display:"flex",gap:8,marginTop:20,justifyContent:"flex-end"}}><Btn variant="ghost" onClick={()=>setModal(false)}>Cancelar</Btn><Btn onClick={save}>Salvar</Btn></div>
+    </Modal>}
+    {edit&&<Modal title="Editar patrimônio" onClose={()=>setEdit(null)}>
+      <QuickEdit item={edit} fields={[{k:"descricao",l:"Descrição",full:true},{k:"categoria",l:"Categoria",t:"select",opts:["Caixa em banco","Conta corrente","Investimento CDB/CDI","Poupança","Outros"]},{k:"valor",l:"Valor (R$)",t:"number"},{k:"rendimento_mensal",l:"Rendimento/mês (R$)",t:"number"},{k:"data",l:"Data",t:"date"},{k:"observacoes",l:"Observações",full:true}]} onSave={saveEdit} onClose={()=>setEdit(null)}/>
+    </Modal>}
+  </div>;
+}
+
 // ─── FINANCEIRO ───────────────────────────────────────────────────────────────
-function Financeiro({caixaDB,custosDB,invDB}){
+function Financeiro({caixaDB,custosDB,invDB,patrimonioDBext}){
   const [aba,setAba]=useState("caixa");
+  const patrimonioDB=useDB("patrimonio");
   const entradas=caixaDB.rows.filter(c=>c.tipo==="Entrada").reduce((s,c)=>s+(+c.valor),0);
   const saidas=caixaDB.rows.filter(c=>c.tipo==="Saída").reduce((s,c)=>s+(+c.valor),0);
   const custoTotal=custosDB.rows.reduce((s,c)=>s+(+c.valor),0);
@@ -588,14 +651,16 @@ function Financeiro({caixaDB,custosDB,invDB}){
       <KPI label="Saídas" value={fmtK(saidas)} color={T.red} icon="↘"/>
       <KPI label="Custos fixos" value={fmtK(custoTotal)} color={T.amber} icon="▲"/>
       <KPI label="Resultado" value={fmtK(resultado)} sub={`Margem ${fmtPct(margem)}`} color={resultado>=0?T.green:T.red} icon="◆"/>
-      <KPI label="Patrimônio" value={fmtK(invTotal)} sub="Rendendo no banco" color={T.blue} icon="◇"/>
+      <KPI label="Investimentos" value={fmtK(invTotal)} sub="Equip. e capacitação" color={T.blue} icon="◇"/>
+      <KPI label="Patrimônio" value={fmtK(patrimonioDB.rows.reduce((s,i)=>s+(+i.valor||0),0))} sub="Guardado/rendendo" color={T.green} icon="💎"/>
     </div>
     <div style={{display:"flex",gap:0,borderBottom:`1px solid ${T.border}`}}>
-      {[{id:"caixa",l:"Caixa"},{id:"custos",l:"Custos"},{id:"investimentos",l:"Investimentos"},{id:"dre",l:"DRE"}].map(t=><button key={t.id} onClick={()=>setAba(t.id)} style={{background:"none",border:"none",borderBottom:aba===t.id?`2px solid ${T.accent}`:"2px solid transparent",color:aba===t.id?T.accentL:T.sub,fontFamily:F,fontWeight:600,fontSize:13,padding:"10px 18px",cursor:"pointer",marginBottom:-1,transition:"all 0.15s"}}>{t.l}</button>)}
+      {[{id:"caixa",l:"💰 Caixa"},{id:"custos",l:"📋 Custos"},{id:"investimentos",l:"🔧 Investimentos"},{id:"patrimonio",l:"💎 Patrimônio"},{id:"dre",l:"📊 DRE"}].map(t=><button key={t.id} onClick={()=>setAba(t.id)} style={{background:"none",border:"none",borderBottom:aba===t.id?`2px solid ${T.accent}`:"2px solid transparent",color:aba===t.id?T.accentL:T.sub,fontFamily:F,fontWeight:600,fontSize:13,padding:"10px 18px",cursor:"pointer",marginBottom:-1,transition:"all 0.15s"}}>{t.l}</button>)}
     </div>
     {aba==="caixa"&&<CaixaTab db={caixaDB}/>}
     {aba==="custos"&&<CustosTab db={custosDB}/>}
     {aba==="investimentos"&&<InvestTab db={invDB}/>}
+    {aba==="patrimonio"&&<PatrimonioTab db={patrimonioDB}/>}
     {aba==="dre"&&<DRETab caixa={caixaDB.rows} custos={custosDB.rows} inv={invDB.rows}/>}
   </div>;
 }
@@ -683,7 +748,7 @@ function CustosTab({db}){
 function InvestTab({db}){
   const [modal,setModal]=useState(false);
   const [edit,setEdit]=useState(null);
-  const [form,setForm]=useState({descricao:"",categoria:"Patrimônio em Banco",valor:"",data:today(),retorno_esperado:""});
+  const [form,setForm]=useState({descricao:"",categoria:"Equipamento",valor:"",data:today(),retorno_esperado:""});
   const s=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
   const save=async()=>{if(!form.descricao||!form.valor)return;await db.add({...form,valor:+form.valor});setModal(false);};
   const saveEdit=async f=>{await db.update(edit.id,{...f,valor:+f.valor});setEdit(null);};
@@ -691,11 +756,11 @@ function InvestTab({db}){
 
   return <div style={{display:"flex",flexDirection:"column",gap:14}}>
     <div style={{background:T.blueBg,border:`1px solid ${T.blue}33`,borderRadius:10,padding:"10px 16px",fontSize:12,color:T.blue}}>
-      💡 Registre aqui o dinheiro que você tem investido/rendendo no banco, equipamentos comprados, aportes, etc.
+      💡 Registre aqui equipamentos comprados, cursos, ferramentas, infraestrutura — tudo que você investe na empresa.
     </div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-      <div style={{fontSize:13,color:T.sub}}>Patrimônio total: <strong style={{color:T.blue,fontFamily:M}}>{fmt(total)}</strong></div>
-      <Btn small onClick={()=>setModal(true)}>+ Registrar</Btn>
+      <div style={{fontSize:13,color:T.sub}}>Total investido na empresa: <strong style={{color:T.blue,fontFamily:M}}>{fmt(total)}</strong></div>
+      <Btn small onClick={()=>setModal(true)}>+ Novo investimento</Btn>
     </div>
     <Card style={{padding:0}}>
       <Table cols={[
@@ -707,13 +772,13 @@ function InvestTab({db}){
         {key:"id",label:"",align:"right",render:(v,r)=><div style={{display:"flex",gap:6}}><Btn variant="soft" small onClick={()=>setEdit(r)}>✎</Btn><Btn variant="danger" small onClick={()=>db.remove(v)}>✕</Btn></div>},
       ]} rows={db.rows}/>
     </Card>
-    {modal&&<Modal title="Registrar patrimônio / investimento" onClose={()=>setModal(false)}>
+    {modal&&<Modal title="Novo investimento na empresa" onClose={()=>setModal(false)}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <Inp label="Descrição *" full value={form.descricao} onChange={s("descricao")} placeholder="Ex: Saldo rendendo no banco, Notebook, etc."/>
-        <Sel label="Categoria" value={form.categoria} onChange={s("categoria")} options={["Patrimônio em Banco","Equipamento","Capacitação","Infraestrutura","Marketing","Tecnologia","Outros"]}/>
+        <Inp label="Descrição *" full value={form.descricao} onChange={s("descricao")} placeholder="Ex: Notebook, Curso de Marketing, Adobe Suite..."/>
+        <Sel label="Categoria" value={form.categoria} onChange={s("categoria")} options={["Equipamento","Capacitação / Curso","Infraestrutura","Marketing","Tecnologia","Software","Outros"]}/>
         <Inp label="Valor (R$) *" type="number" value={form.valor} onChange={s("valor")}/>
         <Inp label="Data" type="date" value={form.data} onChange={s("data")}/>
-        <Inp label="Retorno / Observação" full value={form.retorno_esperado} onChange={s("retorno_esperado")} placeholder="Ex: Rendendo 1% ao mês, CDI 110%..."/>
+        <Inp label="Retorno / Observação" full value={form.retorno_esperado} onChange={s("retorno_esperado")} placeholder="Ex: Aumenta produtividade, necessário para projeto X..."/>
       </div>
       <div style={{display:"flex",gap:8,marginTop:20,justifyContent:"flex-end"}}><Btn variant="ghost" onClick={()=>setModal(false)}>Cancelar</Btn><Btn onClick={save}>Salvar</Btn></div>
     </Modal>}
@@ -947,7 +1012,8 @@ function Dashboard({clientes,caixa,custos,investimentos,leads,lancamentos}){
       <KPI label="Total entradas" value={fmtK(entradas)} sub={`Tudo que entrou no caixa`} color={T.green} icon="↗"/>
       <KPI label="MRR" value={fmtK(mrr)} sub={`${ativos.length} clientes ativos`} color={T.blue} icon="◆"/>
       <KPI label="Pipeline CRM" value={fmtK(pipeline)} sub={`${leads.filter(l=>!["Fechado","Perdido"].includes(l.etapa)).length} leads abertos`} color={T.purple} icon="◎"/>
-      <KPI label="Patrimônio" value={fmtK(invTotal)} sub="Investido/rendendo" color={T.blue} icon="◇"/>
+      <KPI label="Investimentos" value={fmtK(invTotal)} sub="Equip. e capacitação" color={T.blue} icon="◇"/>
+      <KPI label="Patrimônio" value={fmtK(patrimonioDB.rows.reduce((s,i)=>s+(+i.valor||0),0))} sub="Guardado/rendendo" color={T.green} icon="💎"/>
       <KPI label="Resultado" value={fmtK(resultado)} sub={`Margem ${fmtPct(margem)}`} color={T.green} icon="✓"/>
     </div>
 
