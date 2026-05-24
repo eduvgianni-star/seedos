@@ -94,12 +94,13 @@ function LoginScreen() {
 
   return (
     <div onMouseMove={handleMouseMove}
-      style={{minHeight:"100vh",background:"#0a0a14",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,position:"relative",overflow:"hidden"}}>
+      style={{minHeight:"100vh",background:"#1a1a1e",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,position:"relative",overflow:"hidden"}}>
 
-      {/* Animated background blobs following mouse */}
-      <div style={{position:"absolute",width:600,height:600,borderRadius:"50%",background:"radial-gradient(circle, #6aaa3a33, transparent 70%)",left:mouse.x-300,top:mouse.y-300,transition:"left 0.8s ease, top 0.8s ease",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",width:500,height:500,borderRadius:"50%",background:"radial-gradient(circle, #7c3aed33, transparent 70%)",left:mouse.x-150,top:mouse.y-400,transition:"left 1.2s ease, top 1.2s ease",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",width:400,height:400,borderRadius:"50%",background:"radial-gradient(circle, #3a6aaa22, transparent 70%)",left:mouse.x-350,top:mouse.y-100,transition:"left 0.6s ease, top 0.6s ease",pointerEvents:"none"}}/>
+      {/* Swirl blobs following mouse - Seed colors */}
+      <div style={{position:"absolute",width:700,height:700,borderRadius:"40% 60% 55% 45% / 45% 55% 60% 40%",background:"radial-gradient(ellipse, #6aaa3a44, #6aaa3a11 50%, transparent 75%)",left:mouse.x-350,top:mouse.y-350,transition:"left 1s cubic-bezier(0.25,0.46,0.45,0.94), top 1s cubic-bezier(0.25,0.46,0.45,0.94)",pointerEvents:"none",filter:"blur(40px)"}}/>
+      <div style={{position:"absolute",width:600,height:600,borderRadius:"60% 40% 45% 55% / 55% 45% 40% 60%",background:"radial-gradient(ellipse, #5a2d8a44, #5a2d8a11 50%, transparent 75%)",left:mouse.x-200,top:mouse.y-450,transition:"left 1.4s cubic-bezier(0.25,0.46,0.45,0.94), top 1.4s cubic-bezier(0.25,0.46,0.45,0.94)",pointerEvents:"none",filter:"blur(50px)"}}/>
+      <div style={{position:"absolute",width:500,height:500,borderRadius:"50% 50% 40% 60% / 60% 40% 55% 45%",background:"radial-gradient(ellipse, #6aaa3a33, #5a2d8a22 60%, transparent 80%)",left:mouse.x-400,top:mouse.y-150,transition:"left 0.7s cubic-bezier(0.25,0.46,0.45,0.94), top 0.7s cubic-bezier(0.25,0.46,0.45,0.94)",pointerEvents:"none",filter:"blur(60px)"}}/>
+      <div style={{position:"absolute",width:300,height:300,borderRadius:"45% 55% 60% 40% / 40% 60% 45% 55%",background:"radial-gradient(ellipse, #5a2d8a55, transparent 70%)",left:mouse.x-100,top:mouse.y-200,transition:"left 0.5s cubic-bezier(0.25,0.46,0.45,0.94), top 0.5s cubic-bezier(0.25,0.46,0.45,0.94)",pointerEvents:"none",filter:"blur(30px)"}}/>
 
       {/* Card */}
       <div style={{position:"relative",zIndex:10,background:"rgba(15,15,25,0.85)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:28,padding:"48px 44px",width:"100%",maxWidth:420,backdropFilter:"blur(24px)",boxShadow:"0 32px 80px rgba(0,0,0,0.6)"}}>
@@ -1274,7 +1275,7 @@ export default function App(){
   const patrimonioDBroot=useDB("patrimonio");
 
   if(user===undefined) return (
-    <div style={{minHeight:"100vh",background:"#0a0a14",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+    <div style={{minHeight:"100vh",background:"#1a1a1e",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
       <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#6aaa3a,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🌱</div>
       <div style={{color:"rgba(255,255,255,0.4)",fontSize:14,fontFamily:F}}>Carregando...</div>
     </div>
