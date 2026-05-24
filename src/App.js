@@ -264,8 +264,72 @@ function LancamentosTab({clienteId,clienteNome,caixaAdd}){
   </div>;
 }
 
+
+// ─── DUAL PROGRESS ────────────────────────────────────────────────────────────
+function DualProgress({dur,mesExec,mesPago,valor,tipo,valorPago}){
+  dur=Math.max(+dur||1,1);
+  mesExec=Math.min(Math.max(+mesExec||0,0),dur);
+  mesPago=Math.min(Math.max(+mesPago||0,0),dur);
+  const pctExec=(mesExec/dur)*100;
+  const pctPago=(mesPago/dur)*100;
+  const cExec=pctExec>=100?T.green:pctExec>=60?T.accent:pctExec>=30?T.amber:T.blue;
+  const cPago=pctPago>=100?T.green:pctPago>=60?T.green:pctPago>=30?T.green:T.purple;
+  const valorExec=tipo==="Fee Mensal"?(+valor||0)*mesExec:(+valor||0)*(mesExec/dur);
+  const valorTotal=tipo==="Fee Mensal"?(+valor||0)*dur:(+valor||0);
+  const valorRecebido=+valorPago||(+valor||0)*mesPago;
+
+  return <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:14,padding:16,display:"flex",flexDirection:"column",gap:14}}>
+    {/* Barra de pagamento */}
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:cPago}}/>
+          <span style={{fontSize:12,fontWeight:600,color:T.text}}>💰 Pagamento recebido</span>
+        </div>
+        <span style={{fontSize:14,fontWeight:800,color:cPago,fontFamily:M}}>{mesPago} / {dur} meses · {fmt(valorRecebido)}</span>
+      </div>
+      <div style={{background:T.border,borderRadius:6,height:10,overflow:"hidden",marginBottom:4}}>
+        <div style={{background:cPago,width:`${pctPago}%`,height:"100%",borderRadius:6,transition:"width 0.5s"}}/>
+      </div>
+      <div style={{fontSize:11,color:T.muted}}>Entrada no caixa: {fmt(valorRecebido)} de {fmt(valorTotal)}</div>
+    </div>
+
+    {/* Barra de execução */}
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:cExec}}/>
+          <span style={{fontSize:12,fontWeight:600,color:T.text}}>⚙️ Execução / entrega</span>
+        </div>
+        <span style={{fontSize:14,fontWeight:800,color:cExec,fontFamily:M}}>{mesExec} / {dur} meses</span>
+      </div>
+      <div style={{background:T.border,borderRadius:6,height:10,overflow:"hidden",marginBottom:4}}>
+        <div style={{background:cExec,width:`${pctExec}%`,height:"100%",borderRadius:6,transition:"width 0.5s"}}/>
+      </div>
+      <div style={{fontSize:11,color:T.muted}}>Entregue: {fmt(valorExec)} de {fmt(valorTotal)}</div>
+    </div>
+
+    {/* Bolinhas dos meses */}
+    <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+      {Array.from({length:dur},(_,i)=>{
+        const pago=i<mesPago;
+        const exec=i<mesExec;
+        return <div key={i} title={`Mês ${i+1}${pago?" · Pago":""}${exec?" · Executado":""}`}
+          style={{width:28,height:28,borderRadius:"50%",background:pago&&exec?T.green:pago?T.purple:exec?cExec:T.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:(pago||exec)?"#fff":T.muted,fontWeight:700,border:pago&&exec?`2px solid ${T.green}33`:"none"}}>
+          {i+1}
+        </div>;
+      })}
+    </div>
+    <div style={{display:"flex",gap:12,fontSize:11,color:T.muted}}>
+      <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:"50%",background:T.green}}/> Pago + executado</div>
+      <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:"50%",background:T.purple}}/> Só pago</div>
+      <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:"50%",background:cExec}}/> Só executado</div>
+    </div>
+  </div>;
+}
+
 // ─── FICHA CLIENTE ────────────────────────────────────────────────────────────
-const EMPTY_C={nome:"",contato:"",email:"",telefone:"",segmento:"",status:"Ativo",valor_mensal:"",inicio:today(),tipo_contrato:"Fee Mensal",duracao_meses:1,mes_atual:0,escopo_total:"",entregas:"",proposta_url:"",video_url:"",status_saude:"verde",satisfacao:3,nota_saude:"",observacoes:""};
+const EMPTY_C={nome:"",contato:"",email:"",telefone:"",segmento:"",status:"Ativo",valor_mensal:"",inicio:today(),tipo_contrato:"Fee Mensal",duracao_meses:1,mes_atual:0,meses_pagos:0,valor_total_pago:0,escopo_total:"",entregas:"",proposta_url:"",video_url:"",status_saude:"verde",satisfacao:3,nota_saude:"",observacoes:""};
 
 function FichaCliente({item,isNew,onSave,onClose,caixaAdd}){
   const [form,setForm]=useState({
@@ -274,6 +338,8 @@ function FichaCliente({item,isNew,onSave,onClose,caixaAdd}){
     status_saude: ["verde","amarelo","vermelho"].includes(item?.status_saude) ? item.status_saude : "verde",
     duracao_meses: Math.max(+item?.duracao_meses||1, 1),
     mes_atual: Math.max(+item?.mes_atual||0, 0),
+    meses_pagos: Math.max(+item?.meses_pagos||0, 0),
+    valor_total_pago: +item?.valor_total_pago||0,
     satisfacao: +item?.satisfacao||3,
     valor_mensal: item?.valor_mensal||"",
   });
@@ -320,9 +386,15 @@ function FichaCliente({item,isNew,onSave,onClose,caixaAdd}){
         <Inp label="Valor mensal (R$)" type="number" value={form.valor_mensal||""} onChange={set("valor_mensal")}/>
         <Sel label="Tipo de contrato" value={form.tipo_contrato||"Fee Mensal"} onChange={set("tipo_contrato")} options={[{value:"Fee Mensal",label:"Fee Mensal (recorrente)"},{value:"Unitário",label:"Unitário (projeto com prazo)"}]}/>
         <Sel label="Duração total" value={form.duracao_meses||1} onChange={set("duracao_meses")} options={[1,2,3,6,12,24].map(n=>({value:n,label:`${n} ${n===1?"mês":"meses"}`}))}/>
-        <Sel label="Mês atual (fase)" value={form.mes_atual||0} onChange={set("mes_atual")} options={Array.from({length:(+form.duracao_meses||1)+1},(_,i)=>({value:i,label:i===0?"Não iniciado":`Mês ${i} de ${form.duracao_meses}`}))}/>
+        <Sel label="Mês de execução atual" value={form.mes_atual||0} onChange={set("mes_atual")} options={Array.from({length:(+form.duracao_meses||1)+1},(_,i)=>({value:i,label:i===0?"Não iniciado":`Mês ${i} de ${form.duracao_meses}`}))}/>
+        <Sel label="Meses pagos pelo cliente" value={form.meses_pagos||0} onChange={async e=>{
+          const novosPagos=+e.target.value;
+          const anterior=+form.meses_pagos||0;
+          setForm(f=>({...f,meses_pagos:novosPagos,valor_total_pago:(+f.valor_mensal||0)*novosPagos}));
+        }} options={Array.from({length:(+form.duracao_meses||1)+1},(_,i)=>({value:i,label:i===0?"Nenhum pagamento":`${i} ${i===1?"mês pago":"meses pagos"} — ${new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format((+form.valor_mensal||0)*i)}`}))}/>
+        <Inp label="Valor total recebido (R$)" type="number" value={form.valor_total_pago||0} onChange={set("valor_total_pago")}/>
       </div>
-      <ContractProgress dur={form.duracao_meses} mes={form.mes_atual} valor={+form.valor_mensal||0} tipo={form.tipo_contrato}/>
+      <DualProgress dur={form.duracao_meses} mesExec={form.mes_atual} mesPago={form.meses_pagos} valor={+form.valor_mensal||0} tipo={form.tipo_contrato} valorPago={+form.valor_total_pago||0}/>
       <Tex label="Escopo total contratado" full rows={3} value={form.escopo_total||""} onChange={set("escopo_total")} placeholder="O que foi contratado no total..."/>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
         <div><Inp label="Link da proposta" value={form.proposta_url||""} onChange={set("proposta_url")} placeholder="https://drive.google.com/..."/>{form.proposta_url&&<a href={form.proposta_url} target="_blank" rel="noreferrer" style={{fontSize:12,color:T.blue,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:4,marginTop:6}}>🔗 Abrir proposta →</a>}</div>
@@ -363,7 +435,26 @@ function FichaCliente({item,isNew,onSave,onClose,caixaAdd}){
 
     <div style={{display:"flex",gap:8,marginTop:24,justifyContent:"flex-end",paddingTop:20,borderTop:`1px solid ${T.border}`}}>
       <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
-      <Btn onClick={async()=>{setSaving(true);await onSave({...form,valor_mensal:+form.valor_mensal||0,satisfacao:+form.satisfacao||3,duracao_meses:+form.duracao_meses||1,mes_atual:+form.mes_atual||0,status_saude:form.status_saude||"verde"});setSaving(false);}} disabled={saving}>{saving?"Salvando...":"Salvar cliente"}</Btn>
+      <Btn onClick={async()=>{
+        setSaving(true);
+        const prevMesPago = +item?.meses_pagos||0;
+        const novoMesPago = +form.meses_pagos||0;
+        const data={...form,valor_mensal:+form.valor_mensal||0,satisfacao:+form.satisfacao||3,duracao_meses:+form.duracao_meses||1,mes_atual:+form.mes_atual||0,meses_pagos:novoMesPago,valor_total_pago:+form.valor_total_pago||0,status_saude:form.status_saude||"verde"};
+        await onSave(data);
+        // Se novos meses foram pagos, lança no caixa automaticamente
+        if(caixaAdd && novoMesPago > prevMesPago){
+          const mesesNovos = novoMesPago - prevMesPago;
+          const valorNovo = (+form.valor_mensal||0) * mesesNovos;
+          await caixaAdd({
+            data: today(),
+            descricao: `${form.nome} — ${mesesNovos} ${mesesNovos===1?"mensalidade":"mensalidades"} recebida(s)`,
+            tipo: "Entrada",
+            categoria: "Receita de Serviço",
+            valor: valorNovo,
+          });
+        }
+        setSaving(false);
+      }} disabled={saving}>{saving?"Salvando...":"Salvar cliente"}</Btn>
     </div>
   </Modal>;
 }
@@ -453,10 +544,11 @@ function Clientes({caixaAdd}){
             <div style={{fontSize:20,fontWeight:800,color:T.green,fontFamily:M}}>{fmt(item.valor_mensal)}<span style={{fontSize:11,color:T.muted,fontWeight:400}}>/mês</span></div>
             <Badge color={T.blue}>{item.tipo_contrato||"Fee Mensal"}</Badge>
           </div>
-          {dur>1&&mes>=0&&<div style={{marginBottom:12}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:11,color:T.muted}}>Progresso</span><span style={{fontSize:12,fontWeight:700,color:pc,fontFamily:M}}>{mes}/{dur} meses</span></div>
+          {dur>1&&<div style={{marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:11,color:T.muted}}>💰 Pagamento</span><span style={{fontSize:11,fontWeight:700,color:T.purple,fontFamily:M}}>{Math.min(+item.meses_pagos||0,dur)}/{dur}</span></div>
+            <MiniBar value={Math.min(+item.meses_pagos||0,dur)} max={dur} color={T.purple}/>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:6,marginBottom:4}}><span style={{fontSize:11,color:T.muted}}>⚙️ Execução</span><span style={{fontSize:11,fontWeight:700,color:pc,fontFamily:M}}>{mes}/{dur}</span></div>
             <MiniBar value={mes} max={dur} color={pc}/>
-            <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}><span style={{fontSize:10,color:T.muted}}>Exec: {fmt((+item.valor_mensal||0)*mes)}</span><span style={{fontSize:10,color:T.muted}}>Total: {fmt((+item.valor_mensal||0)*dur)}</span></div>
           </div>}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",paddingTop:12,borderTop:`1px solid ${T.border}`}}>
             <Stars value={+item.satisfacao}/>
@@ -486,16 +578,17 @@ function Financeiro({caixaDB,custosDB,invDB}){
   const custoTotal=custosDB.rows.reduce((s,c)=>s+(+c.valor),0);
   const invTotal=invDB.rows.reduce((s,i)=>s+(+i.valor),0);
   const resultado=entradas-saidas-custoTotal;
+  const margem=entradas>0?((entradas-saidas-custoTotal)/entradas)*100:0;
 
   return <div style={{display:"flex",flexDirection:"column",gap:24}}>
     {(caixaDB.toast||custosDB.toast||invDB.toast)&&<Toast {...(caixaDB.toast||custosDB.toast||invDB.toast)}/>}
     <div><h1 style={{color:T.text,fontSize:24,fontWeight:800,margin:0}}>Financeiro</h1><p style={{color:T.sub,fontSize:14,marginTop:4}}>Caixa, custos e investimentos</p></div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
-      <KPI label="Entradas" value={fmtK(entradas)} color={T.green} icon="↗"/>
-      <KPI label="Saídas caixa" value={fmtK(saidas)} color={T.red} icon="↘"/>
+      <KPI label="Entradas" value={fmtK(entradas)} sub="Receitas do caixa" color={T.green} icon="↗"/>
+      <KPI label="Saídas" value={fmtK(saidas)} color={T.red} icon="↘"/>
       <KPI label="Custos fixos" value={fmtK(custoTotal)} color={T.amber} icon="▲"/>
-      <KPI label="Resultado" value={fmtK(resultado)} color={resultado>=0?T.green:T.red} icon="◆"/>
-      <KPI label="Patrimônio invest." value={fmtK(invTotal)} color={T.blue} icon="◇"/>
+      <KPI label="Resultado" value={fmtK(resultado)} sub={`Margem ${fmtPct(margem)}`} color={resultado>=0?T.green:T.red} icon="◆"/>
+      <KPI label="Patrimônio" value={fmtK(invTotal)} sub="Rendendo no banco" color={T.blue} icon="◇"/>
     </div>
     <div style={{display:"flex",gap:0,borderBottom:`1px solid ${T.border}`}}>
       {[{id:"caixa",l:"Caixa"},{id:"custos",l:"Custos"},{id:"investimentos",l:"Investimentos"},{id:"dre",l:"DRE"}].map(t=><button key={t.id} onClick={()=>setAba(t.id)} style={{background:"none",border:"none",borderBottom:aba===t.id?`2px solid ${T.accent}`:"2px solid transparent",color:aba===t.id?T.accentL:T.sub,fontFamily:F,fontWeight:600,fontSize:13,padding:"10px 18px",cursor:"pointer",marginBottom:-1,transition:"all 0.15s"}}>{t.l}</button>)}
@@ -819,6 +912,7 @@ function Dashboard({clientes,caixa,custos,investimentos,leads,lancamentos}){
   const ativos=clientes.filter(c=>c.status==="Ativo");
   const mrr=ativos.reduce((s,c)=>s+(+c.valor_mensal||0),0);
   const entradas=caixa.filter(c=>c.tipo==="Entrada").reduce((s,c)=>s+(+c.valor),0);
+  const receitaClientes=ativos.reduce((s,c)=>s+(+c.valor_total_pago||0),0);
   const saidas=caixa.filter(c=>c.tipo==="Saída").reduce((s,c)=>s+(+c.valor),0);
   const custoTotal=custos.reduce((s,c)=>s+(+c.valor),0);
   const invTotal=investimentos.reduce((s,i)=>s+(+i.valor),0);
