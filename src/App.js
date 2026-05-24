@@ -55,34 +55,107 @@ function getToken() {
 
 function LoginScreen() {
   const [loading, setLoading] = useState(false);
+  const [mouse, setMouse] = useState({x:0,y:0});
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [err, setErr] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
 
-  const loginGoogle = async () => {
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMouse({x: e.clientX - rect.left, y: e.clientY - rect.top});
+  };
+
+  const loginGoogle = () => {
     setLoading(true);
-    const redirectTo = encodeURIComponent(window.location.href);
     window.location.href = `${SB}/auth/v1/authorize?provider=google&redirect_to=${window.location.origin}`;
   };
 
-  return (
-    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F}}>
-      <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:24,padding:"48px 40px",width:"100%",maxWidth:420,textAlign:"center",boxShadow:"0 24px 80px #00000060"}}>
-        <div style={{fontSize:48,marginBottom:16}}>🏢</div>
-        <h1 style={{color:T.text,fontSize:28,fontWeight:800,margin:"0 0 8px",letterSpacing:"-0.02em"}}>Agência<span style={{color:T.accent}}>OS</span></h1>
-        <p style={{color:T.sub,fontSize:14,margin:"0 0 40px"}}>Painel financeiro da sua agência</p>
+  const loginEmail = async () => {
+    if(!email||!pass) return setErr("Preencha email e senha");
+    setLoginLoading(true); setErr("");
+    try {
+      const r = await fetch(`${SB}/auth/v1/token?grant_type=password`,{
+        method:"POST",
+        headers:{apikey:KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({email,password:pass})
+      });
+      const d = await r.json();
+      if(d.access_token){
+        const key=`sb-${SB.split("//")[1].split(".")[0]}-auth-token`;
+        localStorage.setItem(key,JSON.stringify(d));
+        window.location.reload();
+      } else {
+        setErr("Email ou senha incorretos");
+      }
+    } catch { setErr("Erro ao conectar"); }
+    setLoginLoading(false);
+  };
 
+  return (
+    <div onMouseMove={handleMouseMove}
+      style={{minHeight:"100vh",background:"#0a0a14",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,position:"relative",overflow:"hidden"}}>
+
+      {/* Animated background blobs following mouse */}
+      <div style={{position:"absolute",width:600,height:600,borderRadius:"50%",background:"radial-gradient(circle, #6aaa3a33, transparent 70%)",left:mouse.x-300,top:mouse.y-300,transition:"left 0.8s ease, top 0.8s ease",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",width:500,height:500,borderRadius:"50%",background:"radial-gradient(circle, #7c3aed33, transparent 70%)",left:mouse.x-150,top:mouse.y-400,transition:"left 1.2s ease, top 1.2s ease",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",width:400,height:400,borderRadius:"50%",background:"radial-gradient(circle, #3a6aaa22, transparent 70%)",left:mouse.x-350,top:mouse.y-100,transition:"left 0.6s ease, top 0.6s ease",pointerEvents:"none"}}/>
+
+      {/* Card */}
+      <div style={{position:"relative",zIndex:10,background:"rgba(15,15,25,0.85)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:28,padding:"48px 44px",width:"100%",maxWidth:420,backdropFilter:"blur(24px)",boxShadow:"0 32px 80px rgba(0,0,0,0.6)"}}>
+
+        {/* Logo */}
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:64,height:64,borderRadius:18,background:"linear-gradient(135deg, #6aaa3a, #7c3aed)",marginBottom:16,boxShadow:"0 8px 32px rgba(106,170,58,0.4)"}}>
+            <span style={{fontSize:28}}>🌱</span>
+          </div>
+          <h1 style={{color:"#fff",fontSize:26,fontWeight:800,margin:"0 0 4px",letterSpacing:"-0.02em"}}>Seed Content</h1>
+          <p style={{color:"rgba(255,255,255,0.4)",fontSize:13,margin:0}}>Painel financeiro interno</p>
+        </div>
+
+        {/* Email + senha */}
+        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
+          <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="seu@email.com"
+            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"#fff",padding:"12px 16px",fontSize:14,fontFamily:F,outline:"none",transition:"border 0.2s"}}
+            onFocus={e=>e.target.style.borderColor="rgba(106,170,58,0.6)"}
+            onBlur={e=>e.target.style.borderColor="rgba(255,255,255,0.1)"}
+            onKeyDown={e=>e.key==="Enter"&&loginEmail()}/>
+          <input value={pass} onChange={e=>setPass(e.target.value)} type="password" placeholder="••••••••"
+            style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,color:"#fff",padding:"12px 16px",fontSize:14,fontFamily:F,outline:"none",transition:"border 0.2s"}}
+            onFocus={e=>e.target.style.borderColor="rgba(106,170,58,0.6)"}
+            onBlur={e=>e.target.style.borderColor="rgba(255,255,255,0.1)"}
+            onKeyDown={e=>e.key==="Enter"&&loginEmail()}/>
+          {err&&<div style={{fontSize:12,color:"#ff6b6b",textAlign:"center"}}>{err}</div>}
+          <button onClick={loginEmail} disabled={loginLoading}
+            style={{background:"linear-gradient(135deg, #6aaa3a, #5a9a2a)",border:"none",borderRadius:12,color:"#fff",padding:"13px 20px",fontSize:14,fontWeight:700,fontFamily:F,cursor:"pointer",transition:"opacity 0.15s, transform 0.1s",boxShadow:"0 4px 20px rgba(106,170,58,0.4)"}}
+            onMouseEnter={e=>{e.currentTarget.style.opacity="0.9";e.currentTarget.style.transform="translateY(-1px)"}}
+            onMouseLeave={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.transform="translateY(0)"}}>
+            {loginLoading?"Entrando...":"Entrar"}
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+          <div style={{flex:1,height:1,background:"rgba(255,255,255,0.08)"}}/>
+          <span style={{fontSize:12,color:"rgba(255,255,255,0.3)"}}>ou</span>
+          <div style={{flex:1,height:1,background:"rgba(255,255,255,0.08)"}}/>
+        </div>
+
+        {/* Google button */}
         <button onClick={loginGoogle} disabled={loading}
-          style={{width:"100%",background:"#fff",border:"1px solid #e0e0e0",borderRadius:12,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:12,cursor:loading?"not-allowed":"pointer",fontSize:15,fontWeight:600,fontFamily:F,color:"#333",opacity:loading?0.7:1,transition:"all 0.15s"}}
-          onMouseEnter={e=>e.currentTarget.style.background="#f5f5f5"}
-          onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
-          <svg width="20" height="20" viewBox="0 0 48 48">
+          style={{width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:12,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:F,color:"rgba(255,255,255,0.8)",transition:"all 0.15s",boxSizing:"border-box"}}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.1)";e.currentTarget.style.borderColor="rgba(255,255,255,0.2)"}}
+          onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,0.06)";e.currentTarget.style.borderColor="rgba(255,255,255,0.12)"}}>
+          <svg width="18" height="18" viewBox="0 0 48 48">
             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
             <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
             <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
             <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
           </svg>
-          {loading ? "Redirecionando..." : "Entrar com Google"}
+          {loading?"Redirecionando...":"Continuar com Google"}
         </button>
 
-        <p style={{color:T.muted,fontSize:12,marginTop:24}}>Acesso restrito · apenas contas autorizadas</p>
+        <p style={{color:"rgba(255,255,255,0.2)",fontSize:11,marginTop:24,textAlign:"center"}}>Acesso restrito · apenas contas autorizadas</p>
       </div>
     </div>
   );
@@ -1194,14 +1267,7 @@ export default function App(){
     setUser(null);
   };
 
-  if(user===undefined) return (
-    <div style={{minHeight:"100vh",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{color:T.sub,fontSize:14,fontFamily:F}}>Carregando...</div>
-    </div>
-  );
-
-  if(!user) return <LoginScreen/>;
-
+  // All hooks MUST be called before any conditional returns (React rules)
   const clientesDB=useDB("clientes");
   const caixaDB=useDB("caixa");
   const custosDB=useDB("custos");
@@ -1209,6 +1275,15 @@ export default function App(){
   const leadsDB=useDB("leads");
   const lancDB=useDB("lancamentos_clientes");
   const patrimonioDBroot=useDB("patrimonio");
+
+  if(user===undefined) return (
+    <div style={{minHeight:"100vh",background:"#0a0a14",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+      <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#6aaa3a,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🌱</div>
+      <div style={{color:"rgba(255,255,255,0.4)",fontSize:14,fontFamily:F}}>Carregando...</div>
+    </div>
+  );
+
+  if(!user) return <LoginScreen/>;
 
   // Função que adiciona no caixa (passada para componentes filhos)
   const caixaAdd=async(row)=>{
