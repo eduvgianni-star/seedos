@@ -94,7 +94,7 @@ function LoginScreen() {
 
   return (
     <div onMouseMove={handleMouseMove}
-      style={{minHeight:"100vh",background:"#1a1a1e",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,position:"relative",overflow:"hidden"}}>
+      style={{minHeight:"100vh",background:"#0a120a",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:F,position:"relative",overflow:"hidden"}}>
 
       {/* Swirl blobs following mouse - Seed colors */}
       <div style={{position:"absolute",width:700,height:700,borderRadius:"40% 60% 55% 45% / 45% 55% 60% 40%",background:"radial-gradient(ellipse, #6aaa3a44, #6aaa3a11 50%, transparent 75%)",left:mouse.x-350,top:mouse.y-350,transition:"left 1s cubic-bezier(0.25,0.46,0.45,0.94), top 1s cubic-bezier(0.25,0.46,0.45,0.94)",pointerEvents:"none",filter:"blur(40px)"}}/>
@@ -103,7 +103,7 @@ function LoginScreen() {
       <div style={{position:"absolute",width:300,height:300,borderRadius:"45% 55% 60% 40% / 40% 60% 45% 55%",background:"radial-gradient(ellipse, #5a2d8a55, transparent 70%)",left:mouse.x-100,top:mouse.y-200,transition:"left 0.5s cubic-bezier(0.25,0.46,0.45,0.94), top 0.5s cubic-bezier(0.25,0.46,0.45,0.94)",pointerEvents:"none",filter:"blur(30px)"}}/>
 
       {/* Card */}
-      <div style={{position:"relative",zIndex:10,background:"rgba(15,15,25,0.85)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:28,padding:"48px 44px",width:"100%",maxWidth:420,backdropFilter:"blur(24px)",boxShadow:"0 32px 80px rgba(0,0,0,0.6)"}}>
+      <div style={{position:"relative",zIndex:10,background:"rgba(8,16,8,0.92)",border:"1px solid rgba(106,170,58,0.12)",borderRadius:28,padding:"48px 44px",width:"100%",maxWidth:420,backdropFilter:"blur(24px)",boxShadow:"0 32px 80px rgba(0,0,0,0.6)"}}>
 
         {/* Logo */}
         <div style={{textAlign:"center",marginBottom:36}}>
@@ -1275,7 +1275,7 @@ export default function App(){
   const patrimonioDBroot=useDB("patrimonio");
 
   if(user===undefined) return (
-    <div style={{minHeight:"100vh",background:"#1a1a1e",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
+    <div style={{minHeight:"100vh",background:"#0a120a",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
       <div style={{width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#6aaa3a,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🌱</div>
       <div style={{color:"rgba(255,255,255,0.4)",fontSize:14,fontFamily:F}}>Carregando...</div>
     </div>
