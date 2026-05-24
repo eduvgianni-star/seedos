@@ -544,7 +544,7 @@ function Clientes({caixaAdd}){
             <div style={{fontSize:20,fontWeight:800,color:T.green,fontFamily:M}}>{fmt(item.valor_mensal)}<span style={{fontSize:11,color:T.muted,fontWeight:400}}>/mês</span></div>
             <Badge color={T.blue}>{item.tipo_contrato||"Fee Mensal"}</Badge>
           </div>
-          {dur>1&&<div style={{marginBottom:12}}>
+          {dur>=1&&<div style={{marginBottom:12}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:11,color:T.muted}}>💰 Pagamento</span><span style={{fontSize:11,fontWeight:700,color:T.purple,fontFamily:M}}>{Math.min(+item.meses_pagos||0,dur)}/{dur}</span></div>
             <MiniBar value={Math.min(+item.meses_pagos||0,dur)} max={dur} color={T.purple}/>
             <div style={{display:"flex",justifyContent:"space-between",marginTop:6,marginBottom:4}}><span style={{fontSize:11,color:T.muted}}>⚙️ Execução</span><span style={{fontSize:11,fontWeight:700,color:pc,fontFamily:M}}>{mes}/{dur}</span></div>
