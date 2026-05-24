@@ -106,10 +106,7 @@ function LoginScreen() {
 
         {/* Logo */}
         <div style={{textAlign:"center",marginBottom:36}}>
-          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:64,height:64,borderRadius:18,background:"linear-gradient(135deg, #6aaa3a, #7c3aed)",marginBottom:16,boxShadow:"0 8px 32px rgba(106,170,58,0.4)"}}>
-            <span style={{fontSize:28}}>🌱</span>
-          </div>
-          <h1 style={{color:"#fff",fontSize:26,fontWeight:800,margin:"0 0 4px",letterSpacing:"-0.02em"}}>Seed Content</h1>
+          <img src="/Seed.png" alt="Seed Content" style={{width:200,marginBottom:20,filter:"drop-shadow(0 8px 32px rgba(106,170,58,0.4))"}}/>
           <p style={{color:"rgba(255,255,255,0.4)",fontSize:13,margin:0}}>Painel financeiro interno</p>
         </div>
 
