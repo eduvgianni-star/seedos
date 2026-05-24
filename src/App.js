@@ -919,6 +919,7 @@ function Dashboard({clientes,caixa,custos,investimentos,leads,lancamentos}){
   const resultado=entradas-saidas-custoTotal;
   const margem=entradas>0?(resultado/entradas)*100:0;
   const pipeline=leads.filter(l=>!["Fechado","Perdido"].includes(l.etapa)).reduce((s,l)=>s+(+l.valor_estimado||0),0);
+  const totalRecebido=ativos.reduce((s,c)=>s+(+c.valor_total_pago||0),0);
   const avulsosTotal=lancamentos.filter(l=>l.tipo==="Receita").reduce((s,l)=>s+(+l.valor||0),0);
 
   const porSaude=s=>ativos.filter(c=>c.status_saude===s).length;
@@ -943,11 +944,11 @@ function Dashboard({clientes,caixa,custos,investimentos,leads,lancamentos}){
 
     {/* KPIs */}
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12}}>
-      <KPI label="MRR" value={fmtK(mrr)} sub={`${ativos.length} clientes ativos`} color={T.green} icon="↗"/>
-      <KPI label="Resultado" value={fmtK(resultado)} sub={`Margem ${fmtPct(margem)}`} color={resultado>=0?T.green:T.red} icon="◆"/>
-      <KPI label="Entradas totais" value={fmtK(entradas)} sub={`+${fmtK(avulsosTotal)} avulsos`} color={T.accent} icon="+"/>
-      <KPI label="Pipeline CRM" value={fmtK(pipeline)} sub={`${leads.filter(l=>!["Fechado","Perdido"].includes(l.etapa)).length} leads`} color={T.purple} icon="◎"/>
+      <KPI label="Total entradas" value={fmtK(entradas)} sub={`Tudo que entrou no caixa`} color={T.green} icon="↗"/>
+      <KPI label="MRR" value={fmtK(mrr)} sub={`${ativos.length} clientes ativos`} color={T.blue} icon="◆"/>
+      <KPI label="Pipeline CRM" value={fmtK(pipeline)} sub={`${leads.filter(l=>!["Fechado","Perdido"].includes(l.etapa)).length} leads abertos`} color={T.purple} icon="◎"/>
       <KPI label="Patrimônio" value={fmtK(invTotal)} sub="Investido/rendendo" color={T.blue} icon="◇"/>
+      <KPI label="Resultado" value={fmtK(resultado)} sub={`Margem ${fmtPct(margem)}`} color={T.green} icon="✓"/>
     </div>
 
     {/* Saúde + Receita */}
@@ -1008,7 +1009,7 @@ function Dashboard({clientes,caixa,custos,investimentos,leads,lancamentos}){
     <Card>
       <div style={{fontSize:13,fontWeight:700,color:T.text,marginBottom:16}}>Resumo financeiro consolidado</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
-        {[["MRR (contratos ativos)",mrr,T.green],["Avulsos no período",avulsosTotal,T.accent],["Total entradas caixa",entradas,T.green],["Total custos",custoTotal,T.amber],["Saídas caixa",saidas,T.red],["Resultado",resultado,resultado>=0?T.green:T.red],["Patrimônio investido",invTotal,T.blue]].map(([l,v,c])=><div key={l} style={{background:T.surface,borderRadius:12,padding:"12px 16px"}}>
+        {[["MRR esperado",mrr,T.green],["Total recebido clientes",totalRecebido,T.accent],["Avulsos no período",avulsosTotal,T.purple],["Total entradas caixa",entradas,T.green],["Total custos",custoTotal,T.amber],["Resultado",resultado,resultado>=0?T.green:T.red],["Patrimônio investido",invTotal,T.blue]].map(([l,v,c])=><div key={l} style={{background:T.surface,borderRadius:12,padding:"12px 16px"}}>
           <div style={{fontSize:11,color:T.muted,marginBottom:6,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>{l}</div>
           <div style={{fontSize:16,fontWeight:800,color:c,fontFamily:M}}>{fmt(v)}</div>
         </div>)}
