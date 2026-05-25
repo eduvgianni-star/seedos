@@ -1352,7 +1352,7 @@ function NovaDemandaModal({clientes, onSave, onClose}){
         </div>
         <div style={{display:"flex",gap:8,marginTop:20,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={{background:"transparent",border:"1px solid #1c1c30",borderRadius:10,color:"#8888aa",padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>Cancelar</button>
-          <button onClick={()=>{if(form.titulo)onSave(form);}} style={{background:"#6366f1",border:"none",borderRadius:10,color:"#fff",padding:"9px 24px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>Criar demanda</button>
+          <button onClick={()=>{if(form.titulo)onSave({...form, prazo:form.prazo||null, cliente_id:form.cliente_id?+form.cliente_id:null});}} style={{background:"#6366f1",border:"none",borderRadius:10,color:"#fff",padding:"9px 24px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>Criar demanda</button>
         </div>
       </div>
     </div>
@@ -1425,7 +1425,15 @@ function Producao({clientes, canEdit}){
   const canEditHistorico = canEdit;
 
   const salvar = async(form)=>{
-    await add({...form, mes: new Date().toISOString().slice(0,7)});
+    await add({
+      ...form,
+      prazo: form.prazo||null,
+      cliente_id: form.cliente_id?+form.cliente_id:null,
+      tempo_roteiro: 0,
+      tempo_gravacao: 0,
+      tempo_edicao: 0,
+      mes: new Date().toISOString().slice(0,7)
+    });
     setModal(false);
   };
 
