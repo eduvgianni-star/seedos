@@ -1236,7 +1236,12 @@ function DemandaCard({demanda, clientes, onUpdate, onRemove, canEdit, canEditHis
               {key:"roteiro", label:"Roteiro", icon:"✍️", color:"#6366f1", crono:cronoRoteiro, etapasVisiveis:["roteiro","gravacao","edicao","revisao","entregue"]},
               {key:"gravacao", label:"Gravação", icon:"🎬", color:"#f59e0b", crono:cronoGravacao, etapasVisiveis:["gravacao","edicao","revisao","entregue"]},
               {key:"edicao", label:"Edição", icon:"🎞️", color:"#a855f7", crono:cronoEdicao, etapasVisiveis:["edicao","revisao","entregue"]},
-            ].filter(({etapasVisiveis})=>etapasVisiveis.includes(demanda.etapa)).map(({key,label,icon,color,crono})=>(
+            ].filter(({key})=>{
+              if(key==="roteiro") return demanda.etapa==="roteiro";
+              if(key==="gravacao") return demanda.etapa==="gravacao";
+              if(key==="edicao") return ["edicao","revisao","entregue"].includes(demanda.etapa);
+              return false;
+            }).map(({key,label,icon,color,crono})=>(
               <div key={key} style={{background:"#0d0d1a",border:`1px solid #1c1c30`,borderRadius:10,padding:"10px 12px"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
