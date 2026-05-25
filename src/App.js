@@ -1230,13 +1230,13 @@ function DemandaCard({demanda, clientes, onUpdate, onRemove, canEdit, canEditHis
             </div>
           </div>
 
-          {/* Cronômetros */}
+          {/* Cronômetros — só aparecem na etapa correspondente ou posteriores */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {[
-              {key:"roteiro", label:"Roteiro", icon:"✍️", color:"#6366f1", crono:cronoRoteiro},
-              {key:"gravacao", label:"Gravação", icon:"🎬", color:"#f59e0b", crono:cronoGravacao},
-              {key:"edicao", label:"Edição", icon:"🎞️", color:"#a855f7", crono:cronoEdicao},
-            ].map(({key,label,icon,color,crono})=>(
+              {key:"roteiro", label:"Roteiro", icon:"✍️", color:"#6366f1", crono:cronoRoteiro, etapasVisiveis:["roteiro","gravacao","edicao","revisao","entregue"]},
+              {key:"gravacao", label:"Gravação", icon:"🎬", color:"#f59e0b", crono:cronoGravacao, etapasVisiveis:["gravacao","edicao","revisao","entregue"]},
+              {key:"edicao", label:"Edição", icon:"🎞️", color:"#a855f7", crono:cronoEdicao, etapasVisiveis:["edicao","revisao","entregue"]},
+            ].filter(({etapasVisiveis})=>etapasVisiveis.includes(demanda.etapa)).map(({key,label,icon,color,crono})=>(
               <div key={key} style={{background:"#0d0d1a",border:`1px solid #1c1c30`,borderRadius:10,padding:"10px 12px"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -1552,14 +1552,82 @@ function Producao({clientes, canEdit}){
         </div>
       ):
 
-      // ── PROGRESSO VIEW ──
+      // ── DASHBOARD / PROGRESSO VIEW ──
       (
-        <div>
-          <div style={{background:"#0d0d1a",border:"1px solid #1c1c30",borderRadius:12,padding:"12px 16px",marginBottom:16,fontSize:12,color:"#818cf8"}}>
-            📊 Progresso mensal gamificado — cada cliente com seu pacote do contrato
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+
+          {/* KPIs do dashboard */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
+            {[
+              {l:"Total demandas",v:filtered.length,c:"#6366f1",i:"📋"},
+              {l:"Backlog",v:filtered.filter(d=>d.etapa==="backlog").length,c:"#55556a",i:"📥"},
+              {l:"Em produção",v:filtered.filter(d=>["roteiro","gravacao","edicao","revisao"].includes(d.etapa)).length,c:"#f59e0b",i:"⚡"},
+              {l:"Entregues",v:filtered.filter(d=>d.etapa==="entregue").length,c:"#22c55e",i:"✅"},
+              {l:"Tempo total",v:fmtTempo(filtered.reduce((s,d)=>s+(+d.tempo_roteiro||0)+(+d.tempo_gravacao||0)+(+d.tempo_edicao||0),0)),c:"#3b82f6",i:"⏱️"},
+              {l:"Taxa entrega",v:`${filtered.length>0?Math.round((filtered.filter(d=>d.etapa==="entregue").length/filtered.length)*100):0}%`,c:"#a855f7",i:"🎯"},
+            ].map(k=>(
+              <div key={k.l} style={{background:"#111120",border:"1px solid #1c1c30",borderRadius:12,padding:"12px 14px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                  <span style={{fontSize:10,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.07em"}}>{k.l}</span>
+                  <span style={{fontSize:14}}>{k.i}</span>
+                </div>
+                <div style={{fontSize:22,fontWeight:800,color:k.c,fontFamily:"'JetBrains Mono',monospace"}}>{k.v}</div>
+              </div>
+            ))}
           </div>
+
+          {/* Funil de etapas */}
+          <div style={{background:"#111120",border:"1px solid #1c1c30",borderRadius:14,padding:18}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#f0f0fa",marginBottom:14}}>Funil de produção</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {PROD_ETAPAS.map(etapa=>{
+                const qtd=filtered.filter(d=>d.etapa===etapa.id).length;
+                const pct=filtered.length>0?Math.round((qtd/filtered.length)*100):0;
+                return (
+                  <div key={etapa.id} style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:90,fontSize:11,color:"#8888aa",fontWeight:600,flexShrink:0,display:"flex",alignItems:"center",gap:4}}>
+                      <span>{etapa.icon}</span><span>{etapa.label}</span>
+                    </div>
+                    <div style={{flex:1,background:"#1c1c30",borderRadius:6,height:22,overflow:"hidden",position:"relative"}}>
+                      <div style={{background:`linear-gradient(90deg,${etapa.color},${etapa.color}99)`,width:`${pct||0}%`,height:"100%",borderRadius:6,transition:"width 0.6s ease",minWidth:qtd>0?4:0}}/>
+                      {qtd>0&&<span style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",fontSize:11,fontWeight:700,color:"#fff",mixBlendMode:"difference"}}>{qtd} demanda{qtd>1?"s":""}</span>}
+                    </div>
+                    <div style={{width:36,textAlign:"right",fontSize:12,fontWeight:700,color:etapa.color,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{pct}%</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tempo por etapa */}
+          <div style={{background:"#111120",border:"1px solid #1c1c30",borderRadius:14,padding:18}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#f0f0fa",marginBottom:14}}>⏱️ Tempo registrado por etapa</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[
+                {label:"✍️ Roteiro",key:"tempo_roteiro",color:"#6366f1"},
+                {label:"🎬 Gravação",key:"tempo_gravacao",color:"#f59e0b"},
+                {label:"🎞️ Edição",key:"tempo_edicao",color:"#a855f7"},
+              ].map(({label,key,color})=>{
+                const total=filtered.reduce((s,d)=>s+(+d[key]||0),0);
+                const totalGeral=filtered.reduce((s,d)=>s+(+d.tempo_roteiro||0)+(+d.tempo_gravacao||0)+(+d.tempo_edicao||0),0);
+                const pct=totalGeral>0?Math.round((total/totalGeral)*100):0;
+                return (
+                  <div key={key} style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:100,fontSize:12,color:"#8888aa",fontWeight:600,flexShrink:0}}>{label}</div>
+                    <div style={{flex:1,background:"#1c1c30",borderRadius:6,height:18,overflow:"hidden"}}>
+                      <div style={{background:color,width:`${pct}%`,height:"100%",borderRadius:6,transition:"width 0.6s"}}/>
+                    </div>
+                    <div style={{width:60,textAlign:"right",fontSize:12,fontWeight:700,color,fontFamily:"'JetBrains Mono',monospace",flexShrink:0}}>{fmtTempo(total)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Progresso por cliente */}
+          <div style={{fontSize:13,fontWeight:700,color:"#f0f0fa",marginTop:4}}>🏆 Progresso por cliente</div>
           {clientesAtivos.filter(c=>demandas.some(d=>+d.cliente_id===+c.id)).length===0&&(
-            <div style={{color:"#8888aa",textAlign:"center",padding:40,background:"#111120",borderRadius:14}}>Nenhum cliente com demandas este mês</div>
+            <div style={{color:"#8888aa",textAlign:"center",padding:40,background:"#111120",borderRadius:14}}>Nenhum cliente com demandas ainda</div>
           )}
           {clientesAtivos.map(c=><ClienteProgresso key={c.id} cliente={c} demandas={filtered}/>)}
         </div>
