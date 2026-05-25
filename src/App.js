@@ -1095,12 +1095,481 @@ function QuickEdit({item,fields,onSave,onClose}){
   </div>;
 }
 
+
+// ─── PRODUÇÃO (Monday-style) ──────────────────────────────────────────────────
+
+const PROD_ETAPAS = [
+  {id:"backlog",    label:"Backlog",    icon:"📋", color:"#55556a"},
+  {id:"roteiro",   label:"Roteiro",    icon:"✍️",  color:"#6366f1"},
+  {id:"gravacao",  label:"Gravação",   icon:"🎬", color:"#f59e0b"},
+  {id:"edicao",    label:"Edição",     icon:"🎞️",  color:"#a855f7"},
+  {id:"revisao",   label:"Revisão",    icon:"🔍", color:"#3b82f6"},
+  {id:"entregue",  label:"Entregue",   icon:"✅", color:"#22c55e"},
+];
+
+const PROD_TIPOS = [
+  {id:"roteiro",  label:"Roteiro",          icon:"✍️",  color:"#6366f1"},
+  {id:"gravacao", label:"Diária de Gravação",icon:"🎬", color:"#f59e0b"},
+  {id:"edicao",   label:"Edição",            icon:"🎞️",  color:"#a855f7"},
+];
+
+const PRIO_C = {alta:{color:"#ef4444",label:"🔴 Alta"},media:{color:"#f59e0b",label:"🟡 Média"},baixa:{color:"#22c55e",label:"🟢 Baixa"}};
+
+function fmtTempo(segundos){
+  const s=+segundos||0;
+  const h=Math.floor(s/3600);
+  const m=Math.floor((s%3600)/60);
+  const sec=s%60;
+  if(h>0) return `${h}h ${m.toString().padStart(2,"0")}m`;
+  if(m>0) return `${m}m ${sec.toString().padStart(2,"0")}s`;
+  return `${sec}s`;
+}
+
+// ─── CRONÔMETRO HOOK ──────────────────────────────────────────────────────────
+function useCronometro(demandaId, etapa, tempoInicial, onSave){
+  const [rodando, setRodando] = useState(false);
+  const [tempo, setTempo] = useState(+tempoInicial||0);
+  const [inicio, setInicio] = useState(null);
+  const intervalRef = useState(null);
+
+  useEffect(()=>{ setTempo(+tempoInicial||0); },[tempoInicial]);
+
+  useEffect(()=>{
+    if(rodando){
+      const id = setInterval(()=>setTempo(t=>t+1), 1000);
+      intervalRef[1](id);
+      return ()=>clearInterval(id);
+    } else {
+      clearInterval(intervalRef[0]);
+    }
+  },[rodando]);
+
+  const play = ()=>{
+    if(!rodando){ setInicio(Date.now()); setRodando(true); }
+  };
+  const pause = ()=>{
+    if(rodando){ setRodando(false); onSave&&onSave(tempo); }
+  };
+  const stop = ()=>{
+    setRodando(false);
+    onSave&&onSave(tempo);
+  };
+  const reset = ()=>{ setRodando(false); setTempo(0); onSave&&onSave(0); };
+  return {tempo, rodando, play, pause, stop, reset};
+}
+
+// ─── CARD DE DEMANDA ──────────────────────────────────────────────────────────
+function DemandaCard({demanda, clientes, onUpdate, onRemove, canEdit, canEditHistorico}){
+  const [expandido, setExpandido] = useState(false);
+  const cliente = clientes.find(c=>+c.id===+demanda.cliente_id);
+  const etapa = PROD_ETAPAS.find(e=>e.id===demanda.etapa)||PROD_ETAPAS[0];
+  const tipo = PROD_TIPOS.find(t=>t.id===demanda.tipo)||PROD_TIPOS[0];
+
+  const salvarTempo = async(campo, valor)=>{
+    await onUpdate(demanda.id, {...demanda, [campo]: valor});
+  };
+
+  const cronoRoteiro = useCronometro(demanda.id,"roteiro", demanda.tempo_roteiro||0,
+    v=>salvarTempo("tempo_roteiro",v));
+  const cronoGravacao = useCronometro(demanda.id,"gravacao", demanda.tempo_gravacao||0,
+    v=>salvarTempo("tempo_gravacao",v));
+  const cronoEdicao = useCronometro(demanda.id,"edicao", demanda.tempo_edicao||0,
+    v=>salvarTempo("tempo_edicao",v));
+
+  const cronos = {roteiro: cronoRoteiro, gravacao: cronoGravacao, edicao: cronoEdicao};
+  const prio = PRIO_C[demanda.prioridade||"media"];
+
+  const moverEtapa = async(novaEtapa)=>{
+    await onUpdate(demanda.id, {...demanda, etapa: novaEtapa});
+  };
+
+  return (
+    <div style={{background:"#111120",border:`1px solid ${etapa.color}44`,borderLeft:`3px solid ${etapa.color}`,borderRadius:12,marginBottom:8,overflow:"hidden",transition:"all 0.2s"}}>
+      {/* Header do card */}
+      <div onClick={()=>setExpandido(e=>!e)} style={{padding:"10px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+            <span style={{fontSize:13}}>{tipo.icon}</span>
+            <span style={{fontSize:13,fontWeight:700,color:"#f0f0fa",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{demanda.titulo}</span>
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+            {cliente&&<span style={{fontSize:10,color:"#8888aa",background:"#1c1c30",padding:"2px 8px",borderRadius:10}}>📎 {cliente.nome}</span>}
+            <span style={{fontSize:10,color:prio.color}}>{prio.label}</span>
+            {demanda.prazo&&<span style={{fontSize:10,color:"#8888aa"}}>📅 {demanda.prazo}</span>}
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+          <span style={{background:etapa.color+"22",color:etapa.color,fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:8}}>{etapa.icon} {etapa.label}</span>
+          <span style={{color:"#55556a",fontSize:12}}>{expandido?"▲":"▼"}</span>
+        </div>
+      </div>
+
+      {/* Barras de tempo resumo */}
+      {(demanda.tempo_roteiro>0||demanda.tempo_gravacao>0||demanda.tempo_edicao>0)&&!expandido&&(
+        <div style={{padding:"0 14px 10px",display:"flex",gap:8}}>
+          {demanda.tempo_roteiro>0&&<span style={{fontSize:10,color:"#6366f1"}}>✍️ {fmtTempo(demanda.tempo_roteiro)}</span>}
+          {demanda.tempo_gravacao>0&&<span style={{fontSize:10,color:"#f59e0b"}}>🎬 {fmtTempo(demanda.tempo_gravacao)}</span>}
+          {demanda.tempo_edicao>0&&<span style={{fontSize:10,color:"#a855f7"}}>🎞️ {fmtTempo(demanda.tempo_edicao)}</span>}
+        </div>
+      )}
+
+      {/* Conteúdo expandido */}
+      {expandido&&(
+        <div style={{padding:"0 14px 14px",borderTop:"1px solid #1c1c3044"}}>
+
+          {/* Mover etapa */}
+          <div style={{marginTop:10,marginBottom:12}}>
+            <div style={{fontSize:10,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Etapa</div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              {PROD_ETAPAS.map(e=>(
+                <button key={e.id} onClick={()=>moverEtapa(e.id)}
+                  style={{background:demanda.etapa===e.id?e.color+"33":"transparent",border:`1px solid ${demanda.etapa===e.id?e.color:"#1c1c30"}`,color:demanda.etapa===e.id?e.color:"#55556a",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>
+                  {e.icon} {e.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cronômetros */}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {[
+              {key:"roteiro", label:"Roteiro", icon:"✍️", color:"#6366f1", crono:cronoRoteiro},
+              {key:"gravacao", label:"Gravação", icon:"🎬", color:"#f59e0b", crono:cronoGravacao},
+              {key:"edicao", label:"Edição", icon:"🎞️", color:"#a855f7", crono:cronoEdicao},
+            ].map(({key,label,icon,color,crono})=>(
+              <div key={key} style={{background:"#0d0d1a",border:`1px solid #1c1c30`,borderRadius:10,padding:"10px 12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span>{icon}</span>
+                    <span style={{fontSize:12,fontWeight:600,color:"#f0f0fa"}}>{label}</span>
+                    {crono.rodando&&<span style={{width:6,height:6,borderRadius:"50%",background:color,display:"inline-block",animation:"pulse 1s infinite"}}/>}
+                  </div>
+                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:15,fontWeight:800,color:crono.rodando?color:"#8888aa"}}>{fmtTempo(crono.tempo)}</span>
+                </div>
+                <div style={{display:"flex",gap:6,marginTop:8}}>
+                  {!crono.rodando
+                    ?<button onClick={crono.play} style={{background:color+"22",border:`1px solid ${color}44`,borderRadius:8,color:color,padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Inter',sans-serif",display:"flex",alignItems:"center",gap:4}}>▶ Play</button>
+                    :<button onClick={crono.pause} style={{background:"#f59e0b22",border:"1px solid #f59e0b44",borderRadius:8,color:"#f59e0b",padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Inter',sans-serif",display:"flex",alignItems:"center",gap:4}}>⏸ Pause</button>
+                  }
+                  <button onClick={crono.stop} style={{background:"#ef444422",border:"1px solid #ef444444",borderRadius:8,color:"#ef4444",padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Inter',sans-serif",display:"flex",alignItems:"center",gap:4}}>⏹ Stop</button>
+                  {canEditHistorico&&<button onClick={crono.reset} style={{background:"transparent",border:"1px solid #1c1c30",borderRadius:8,color:"#55556a",padding:"5px 10px",fontSize:11,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>↺ Reset</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Links */}
+          {(demanda.link_roteiro||demanda.link_video||demanda.link_entrega)&&(
+            <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+              {demanda.link_roteiro&&<a href={demanda.link_roteiro} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#6366f1",textDecoration:"none",background:"#6366f115",padding:"4px 10px",borderRadius:8}}>✍️ Roteiro</a>}
+              {demanda.link_video&&<a href={demanda.link_video} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#f59e0b",textDecoration:"none",background:"#f59e0b15",padding:"4px 10px",borderRadius:8}}>🎬 Vídeo</a>}
+              {demanda.link_entrega&&<a href={demanda.link_entrega} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#22c55e",textDecoration:"none",background:"#22c55e15",padding:"4px 10px",borderRadius:8}}>✅ Entrega</a>}
+            </div>
+          )}
+
+          {demanda.descricao&&<div style={{marginTop:10,fontSize:12,color:"#8888aa",lineHeight:1.5}}>{demanda.descricao}</div>}
+
+          {/* Ações */}
+          <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}>
+            <button onClick={()=>onRemove(demanda.id)} style={{background:"#ef444412",border:"1px solid #ef444433",borderRadius:8,color:"#ef4444",padding:"4px 12px",fontSize:11,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>Remover</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MODAL NOVA DEMANDA ───────────────────────────────────────────────────────
+function NovaDemandaModal({clientes, onSave, onClose}){
+  const [form, setForm] = useState({
+    titulo:"", descricao:"", cliente_id:"", tipo:"roteiro",
+    etapa:"backlog", prioridade:"media", prazo:"",
+    link_roteiro:"", link_video:"", link_entrega:"",
+    tempo_roteiro:0, tempo_gravacao:0, tempo_edicao:0,
+  });
+  const s = k=>e=>setForm(f=>({...f,[k]:e.target.value}));
+  const iS2 = {background:"#0d0d1a",border:"1px solid #1c1c30",borderRadius:10,color:"#f0f0fa",padding:"9px 13px",fontSize:13,fontFamily:"'Inter',sans-serif",outline:"none",width:"100%",boxSizing:"border-box"};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#00000090",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(4px)"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{background:"#111120",border:"1px solid #1c1c30",borderRadius:20,padding:28,width:"100%",maxWidth:580,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h3 style={{color:"#f0f0fa",fontWeight:700,fontSize:17,margin:0}}>Nova demanda</h3>
+          <button onClick={onClose} style={{background:"transparent",border:"1px solid #1c1c30",borderRadius:8,color:"#8888aa",padding:"4px 10px",cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>✕</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Título *</label>
+            <input value={form.titulo} onChange={s("titulo")} placeholder="Ex: Vídeo institucional janeiro..." style={iS2} onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#1c1c30"}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Cliente</label>
+            <select value={form.cliente_id} onChange={s("cliente_id")} style={{...iS2,cursor:"pointer"}}>
+              <option value="">— Selecionar —</option>
+              {clientes.filter(c=>c.status==="Ativo").map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Tipo</label>
+            <select value={form.tipo} onChange={s("tipo")} style={{...iS2,cursor:"pointer"}}>
+              {PROD_TIPOS.map(t=><option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Etapa inicial</label>
+            <select value={form.etapa} onChange={s("etapa")} style={{...iS2,cursor:"pointer"}}>
+              {PROD_ETAPAS.map(e=><option key={e.id} value={e.id}>{e.icon} {e.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Prioridade</label>
+            <select value={form.prioridade} onChange={s("prioridade")} style={{...iS2,cursor:"pointer"}}>
+              <option value="alta">🔴 Alta</option>
+              <option value="media">🟡 Média</option>
+              <option value="baixa">🟢 Baixa</option>
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Prazo</label>
+            <input type="date" value={form.prazo} onChange={s("prazo")} style={iS2} onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#1c1c30"}/>
+          </div>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Descrição</label>
+            <textarea value={form.descricao} onChange={s("descricao")} rows={2} placeholder="Briefing, referências, detalhes..." style={{...iS2,resize:"vertical"}} onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#1c1c30"}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Link do roteiro</label>
+            <input value={form.link_roteiro} onChange={s("link_roteiro")} placeholder="Drive, Notion..." style={iS2} onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#1c1c30"}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Link do vídeo gravado</label>
+            <input value={form.link_video} onChange={s("link_video")} placeholder="Drive, WeTransfer..." style={iS2} onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#1c1c30"}/>
+          </div>
+          <div style={{gridColumn:"1/-1"}}>
+            <label style={{fontSize:11,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:5}}>Link da entrega final</label>
+            <input value={form.link_entrega} onChange={s("link_entrega")} placeholder="YouTube, Drive..." style={iS2} onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#1c1c30"}/>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:20,justifyContent:"flex-end"}}>
+          <button onClick={onClose} style={{background:"transparent",border:"1px solid #1c1c30",borderRadius:10,color:"#8888aa",padding:"9px 20px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>Cancelar</button>
+          <button onClick={()=>{if(form.titulo)onSave(form);}} style={{background:"#6366f1",border:"none",borderRadius:10,color:"#fff",padding:"9px 24px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>Criar demanda</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PROGRESSO DO CLIENTE (gamificado) ───────────────────────────────────────
+function ClienteProgresso({cliente, demandas}){
+  const minhas = demandas.filter(d=>+d.cliente_id===+cliente.id);
+  const entregues = minhas.filter(d=>d.etapa==="entregue").length;
+  const total = minhas.length;
+  if(total===0) return null;
+  const pct = Math.round((entregues/total)*100);
+  const cor = pct===100?"#22c55e":pct>=60?"#6366f1":pct>=30?"#f59e0b":"#ef4444";
+  const emoji = pct===100?"🏆":pct>=60?"🚀":pct>=30?"⚡":"🔥";
+
+  // Agrupamento por tipo
+  const porTipo = PROD_TIPOS.map(t=>({
+    ...t,
+    total: minhas.filter(d=>d.tipo===t.id).length,
+    feitos: minhas.filter(d=>d.tipo===t.id&&d.etapa==="entregue").length,
+  })).filter(t=>t.total>0);
+
+  return (
+    <div style={{background:"#111120",border:`1px solid ${cor}33`,borderRadius:14,padding:16,marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:20}}>{emoji}</span>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#f0f0fa"}}>{cliente.nome}</div>
+            <div style={{fontSize:11,color:"#8888aa"}}>{entregues} de {total} entregas concluídas</div>
+          </div>
+        </div>
+        <div style={{fontSize:24,fontWeight:800,color:cor,fontFamily:"'JetBrains Mono',monospace"}}>{pct}%</div>
+      </div>
+      {/* Barra principal */}
+      <div style={{background:"#1c1c30",borderRadius:8,height:12,overflow:"hidden",marginBottom:10,position:"relative"}}>
+        <div style={{background:`linear-gradient(90deg, ${cor}, ${cor}aa)`,width:`${pct}%`,height:"100%",borderRadius:8,transition:"width 0.8s ease",position:"relative"}}>
+          {pct>10&&<div style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",fontSize:8,color:"#fff",fontWeight:700}}>{pct}%</div>}
+        </div>
+      </div>
+      {/* Por tipo */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {porTipo.map(t=>(
+          <div key={t.id} style={{background:"#0d0d1a",borderRadius:8,padding:"6px 10px",display:"flex",alignItems:"center",gap:6,flex:1,minWidth:80}}>
+            <span style={{fontSize:12}}>{t.icon}</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:10,color:"#8888aa",marginBottom:3}}>{t.label}</div>
+              <div style={{background:"#1c1c30",borderRadius:4,height:4,overflow:"hidden"}}>
+                <div style={{background:t.color,width:`${t.total>0?(t.feitos/t.total)*100:0}%`,height:"100%",borderRadius:4,transition:"width 0.6s"}}/>
+              </div>
+            </div>
+            <span style={{fontSize:11,fontWeight:700,color:t.color,fontFamily:"'JetBrains Mono',monospace"}}>{t.feitos}/{t.total}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── TELA PRINCIPAL DE PRODUÇÃO ───────────────────────────────────────────────
+function Producao({clientes, canEdit}){
+  const {rows:demandas, loading, add, update, remove, toast} = useDB("demandas");
+  const [view, setView] = useState("board");
+  const [modal, setModal] = useState(false);
+  const [filtroCliente, setFiltroCliente] = useState("todos");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [search, setSearch] = useState("");
+
+  const canEditHistorico = canEdit;
+
+  const salvar = async(form)=>{
+    await add({...form, mes: new Date().toISOString().slice(0,7)});
+    setModal(false);
+  };
+
+  const atualizar = async(id, data)=>{
+    await update(id, data);
+  };
+
+  const remover = async(id)=>{
+    if(window.confirm("Remover esta demanda?")) await remove(id);
+  };
+
+  const filtered = demandas.filter(d=>{
+    const mc = filtroCliente==="todos"||+d.cliente_id===+filtroCliente;
+    const mt = filtroTipo==="todos"||d.tipo===filtroTipo;
+    const ms = !search||(d.titulo||"").toLowerCase().includes(search.toLowerCase());
+    return mc&&mt&&ms;
+  });
+
+  // Stats gerais
+  const total = filtered.length;
+  const entregues = filtered.filter(d=>d.etapa==="entregue").length;
+  const emAndamento = filtered.filter(d=>!["backlog","entregue"].includes(d.etapa)).length;
+  const tempoTotal = filtered.reduce((s,d)=>s+(+d.tempo_roteiro||0)+(+d.tempo_gravacao||0)+(+d.tempo_edicao||0),0);
+
+  // Clientes com demandas no mês
+  const clientesAtivos = clientes.filter(c=>c.status==="Ativo");
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      {toast&&<div style={{position:"fixed",bottom:28,right:28,zIndex:999,background:"#111120",border:"1px solid #22c55e44",borderRadius:12,padding:"12px 20px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 16px 48px #00000080"}}><span style={{color:"#22c55e"}}>✓</span><span style={{color:"#f0f0fa",fontSize:13,fontWeight:500}}>{toast.msg}</span></div>}
+
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+        <div>
+          <h1 style={{color:"#f0f0fa",fontSize:24,fontWeight:800,margin:0}}>Produção</h1>
+          <p style={{color:"#8888aa",fontSize:14,marginTop:4}}>Gestão de demandas · estilo Monday</p>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{display:"flex",gap:4,background:"#0d0d1a",borderRadius:10,padding:4,border:"1px solid #1c1c30"}}>
+            {[{id:"board",l:"⊞ Board"},{id:"lista",l:"≡ Lista"},{id:"progresso",l:"📊 Progresso"}].map(v=>(
+              <button key={v.id} onClick={()=>setView(v.id)} style={{background:view===v.id?"#6366f120":"transparent",border:view===v.id?"1px solid #6366f144":"1px solid transparent",borderRadius:8,color:view===v.id?"#818cf8":"#8888aa",padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'Inter',sans-serif"}}>{v.l}</button>
+            ))}
+          </div>
+          <button onClick={()=>setModal(true)} style={{background:"#6366f1",border:"none",borderRadius:10,color:"#fff",padding:"10px 20px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Inter',sans-serif",display:"flex",alignItems:"center",gap:6}}>+ Nova demanda</button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10}}>
+        {[
+          {l:"Total",v:total,c:"#6366f1",i:"📋"},
+          {l:"Em andamento",v:emAndamento,c:"#f59e0b",i:"⚡"},
+          {l:"Entregues",v:entregues,c:"#22c55e",i:"✅"},
+          {l:"Tempo total",v:fmtTempo(tempoTotal),c:"#3b82f6",i:"⏱️"},
+        ].map(k=>(
+          <div key={k.l} style={{background:"#111120",border:`1px solid #1c1c30`,borderRadius:14,padding:"14px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <span style={{fontSize:10,color:"#8888aa",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.08em"}}>{k.l}</span>
+              <span style={{fontSize:16}}>{k.i}</span>
+            </div>
+            <div style={{fontSize:22,fontWeight:800,color:k.c,fontFamily:"'JetBrains Mono',monospace"}}>{k.v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar demanda..." style={{background:"#0d0d1a",border:"1px solid #1c1c30",borderRadius:10,color:"#f0f0fa",padding:"8px 14px",fontSize:13,fontFamily:"'Inter',sans-serif",outline:"none",flex:1,minWidth:180,maxWidth:280}} onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#1c1c30"}/>
+        <select value={filtroCliente} onChange={e=>setFiltroCliente(e.target.value)} style={{background:"#0d0d1a",border:"1px solid #1c1c30",borderRadius:10,color:"#f0f0fa",padding:"8px 12px",fontSize:12,fontFamily:"'Inter',sans-serif",cursor:"pointer"}}>
+          <option value="todos">Todos os clientes</option>
+          {clientesAtivos.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+        </select>
+        <select value={filtroTipo} onChange={e=>setFiltroTipo(e.target.value)} style={{background:"#0d0d1a",border:"1px solid #1c1c30",borderRadius:10,color:"#f0f0fa",padding:"8px 12px",fontSize:12,fontFamily:"'Inter',sans-serif",cursor:"pointer"}}>
+          <option value="todos">Todos os tipos</option>
+          {PROD_TIPOS.map(t=><option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+        </select>
+      </div>
+
+      {loading?<div style={{color:"#8888aa",textAlign:"center",padding:48}}>Carregando...</div>:
+
+      // ── BOARD VIEW ──
+      view==="board"?(
+        <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:12}}>
+          {PROD_ETAPAS.map(etapa=>{
+            const cards = filtered.filter(d=>d.etapa===etapa.id);
+            return (
+              <div key={etapa.id} style={{minWidth:260,flex:"0 0 260px",background:"#0d0d1a",border:`1px solid #1c1c30`,borderRadius:14,padding:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:14}}>{etapa.icon}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:"#f0f0fa"}}>{etapa.label}</span>
+                  </div>
+                  <span style={{background:etapa.color+"22",color:etapa.color,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10}}>{cards.length}</span>
+                </div>
+                {/* Mini barra de progresso da coluna */}
+                <div style={{background:"#1c1c30",borderRadius:4,height:3,marginBottom:12,overflow:"hidden"}}>
+                  <div style={{background:etapa.color,width:etapa.id==="entregue"?"100%":"0%",height:"100%"}}/>
+                </div>
+                {cards.length===0&&<div style={{color:"#22223a",fontSize:12,textAlign:"center",padding:"20px 0"}}>Sem demandas</div>}
+                {cards.map(d=>(
+                  <DemandaCard key={d.id} demanda={d} clientes={clientes} onUpdate={atualizar} onRemove={remover} canEdit={canEdit} canEditHistorico={canEditHistorico}/>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      ):
+
+      // ── LISTA VIEW ──
+      view==="lista"?(
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {filtered.length===0&&<div style={{color:"#8888aa",textAlign:"center",padding:40,background:"#111120",borderRadius:14}}>Nenhuma demanda encontrada</div>}
+          {filtered.map(d=>(
+            <DemandaCard key={d.id} demanda={d} clientes={clientes} onUpdate={atualizar} onRemove={remover} canEdit={canEdit} canEditHistorico={canEditHistorico}/>
+          ))}
+        </div>
+      ):
+
+      // ── PROGRESSO VIEW ──
+      (
+        <div>
+          <div style={{background:"#0d0d1a",border:"1px solid #1c1c30",borderRadius:12,padding:"12px 16px",marginBottom:16,fontSize:12,color:"#818cf8"}}>
+            📊 Progresso mensal gamificado — cada cliente com seu pacote do contrato
+          </div>
+          {clientesAtivos.filter(c=>demandas.some(d=>+d.cliente_id===+c.id)).length===0&&(
+            <div style={{color:"#8888aa",textAlign:"center",padding:40,background:"#111120",borderRadius:14}}>Nenhum cliente com demandas este mês</div>
+          )}
+          {clientesAtivos.map(c=><ClienteProgresso key={c.id} cliente={c} demandas={filtered}/>)}
+        </div>
+      )}
+
+      {modal&&<NovaDemandaModal clientes={clientesAtivos} onSave={salvar} onClose={()=>setModal(false)}/>}
+    </div>
+  );
+}
+
+
 // ─── NAV + ROOT ───────────────────────────────────────────────────────────────
 const NAV=[
   {id:"dashboard",label:"Dashboard",icon:"▣"},
   {id:"clientes",label:"Clientes",icon:"◉"},
   {id:"financeiro",label:"Financeiro",icon:"◆"},
   {id:"crm",label:"CRM",icon:"◎"},
+  {id:"producao",label:"Produção",icon:"🎬"},
 ];
 
 export default function App(){
@@ -1157,6 +1626,7 @@ export default function App(){
     clientes:<Clientes caixaAdd={caixaAdd} canEdit={canEdit}/>,
     financeiro:<Financeiro caixaDB={caixaDB} custosDB={custosDB} invDB={invDB} canEdit={canEdit}/>,
     crm:<CRM clientesAdd={clientesAdd} canEdit={canEdit}/>,
+    producao:<Producao clientes={clientesDB.rows} canEdit={canEdit}/>,
   };
 
   return <div style={{display:"flex",minHeight:"100vh",background:T.bg,fontFamily:F,color:T.text}}>
